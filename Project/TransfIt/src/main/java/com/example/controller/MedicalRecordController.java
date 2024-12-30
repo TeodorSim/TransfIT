@@ -5,7 +5,6 @@ import com.example.model.entities.MedicalRecord;
 import com.example.service.MedicalRecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Repository;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,10 +30,10 @@ public class MedicalRecordController {
     @PostMapping
     public ResponseEntity<?> createMedicalRecord(@RequestBody MedicalRecord medicalRecord) {
         // Usage of the factory method
-        Result<MedicalRecord> result = MedicalRecord.CreateMedicalRecord(
+        Result<MedicalRecord> result = MedicalRecord.createMedicalRecord(
                 medicalRecord.getDiagnosis(),
                 medicalRecord.getTreatment(),
-                medicalRecord.getUserId()
+                medicalRecord.getPatient()
         );
 
         if(!result.isSuccess){

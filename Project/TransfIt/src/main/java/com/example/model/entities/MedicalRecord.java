@@ -1,40 +1,51 @@
 package com.example.model.entities;
 
 import com.example.model.common.Result;
-import com.sun.net.httpserver.Authenticator;
+import com.example.model.entities.dental.Patient;
 import jakarta.persistence.*;
 
+// Entity for MedicalRecord
 @Entity
-@Table(name = "medicalrecord")
+@Table(name = "MedicalRecord")
 public class MedicalRecord {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "record_id")
+    private Long recordId;
 
+    @Column(name = "diagnosis", nullable = false)
     private String diagnosis;
+
+    @Column(name = "treatment", nullable = false)
     private String treatment;
-    private Long userId;
-    // Additional fields, getters, and setters
+
+    @ManyToOne
+    @JoinColumn(name = "patient_id", nullable = false)
+    private Patient patient;
+
     public MedicalRecord() {}
-    protected MedicalRecord(String diagnosis, String treatment, Long userId) {
+
+    public MedicalRecord(String diagnosis, String treatment, Patient patient) {
         this.diagnosis = diagnosis;
         this.treatment = treatment;
-        this.userId = userId;
+        this.patient = patient;
     }
-    public static Result<MedicalRecord> CreateMedicalRecord(String diagnosis, String treatment, Long userId) {
-        return Result.Success(new MedicalRecord(diagnosis, treatment, userId));
+
+    public static Result<MedicalRecord> createMedicalRecord(String diagnosis, String treatment, Patient patient) {
+        return Result.Success(new MedicalRecord(diagnosis, treatment, patient));
     }
 
     public Long getId() {
-        return id;
-    }
-    public Long getUserId() {
-        return userId;
+        return recordId;
     }
     public String getDiagnosis() {
         return diagnosis;
     }
     public String getTreatment() {
         return treatment;
+    }
+    public Patient getPatient() {
+        return patient;
     }
 }

@@ -1,9 +1,8 @@
 package com.example.controller;
 
 import com.example.model.common.Result;
-import com.example.model.entities.MedicalRecord;
-import com.example.model.entities.User;
-import com.example.service.UserService;
+import com.example.model.entities.UserClass;
+import com.example.service.UserClassService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,27 +12,27 @@ import java.util.List;
 @RequestMapping("/api/user/" + 1.1)
 public class UserController {
     @Autowired
-    private UserService userService;
+    private UserClassService UserClassService;
 
     //@GetMapping("/getAll")
 
     @GetMapping()
-    public List<User> getUsers() {
-        return userService.getAllUsers();
+    public List<UserClass> getUsers() {
+        return UserClassService.getAllUserClasss();
     }
 
     @GetMapping("/getById")
     //@GetMapping()
-    public User getUserById(Long id) {
-        return userService.getUserById(id);
+    public UserClass getUserById(@RequestParam Long id) {
+        return UserClassService.getUserClassById(id);
     }
 
     //@PostMapping("/create")
     @PostMapping()
-    public ResponseEntity<?>  createUser(@RequestBody User user) {
+    public ResponseEntity<?>  createUser(@RequestBody UserClass user) {
 
         // Usage of the factory method
-        Result<User> result = User.CreateUser(
+        Result<UserClass> result = UserClass.CreateUserClass(
                 user.getUsername(),
                 user.getPassword(),
                 user.getEmail()
@@ -45,7 +44,7 @@ public class UserController {
             return ResponseEntity.badRequest().body(result.error);
         }
 
-        userService.saveUser(result.value);
+        UserClassService.saveUserClass(result.value);
         return ResponseEntity.ok().build();
     }
 }

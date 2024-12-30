@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "users") // Custom table name
-public class User{
+public class UserClass{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -13,14 +13,14 @@ public class User{
     private String password;
     private String email;
 
-    public User() {}
-    protected User(String username, String password, String email) {
+    public UserClass() {}
+    protected UserClass(String username, String password, String email) {
         this.username = username;
         this.password = password;
         this.email = email;
     }
-    public static Result<User> CreateUser(String username, String password, String email){
-        return Result.Success(new User(username, password, email));
+    public static Result<UserClass> CreateUserClass(String username, String password, String email){
+        return Result.Success(new UserClass(username, password, email));
     }
 
     public Long getId() {
