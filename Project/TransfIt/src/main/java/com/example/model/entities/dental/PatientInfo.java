@@ -1,6 +1,10 @@
 package com.example.model.entities.dental;
 
 import com.example.model.common.Result;
+import com.example.model.deserializer.CharacterDeserializer;
+import com.example.model.entities.typedef.RepresentativeConverter;
+import com.example.model.entities.typedef.Representitve;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -12,7 +16,7 @@ public class PatientInfo {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "patient_sin")
-    private Long patientSin;
+    private Integer patientSin;
 
     @Column(name = "address", nullable = false)
     private String address;
@@ -21,6 +25,7 @@ public class PatientInfo {
     private String name;
 
     @Column(name = "gender", nullable = false, length = 1)
+    @JsonDeserialize(using = CharacterDeserializer.class)
     private String gender;
 
     @Column(name = "email", nullable = false)
@@ -35,12 +40,27 @@ public class PatientInfo {
     @Column(name = "insurance")
     private String insurance;
 
+    @Convert(converter = RepresentativeConverter.class)
+    @Column(name = "rep")
+    private Representative representative;
+
+
     // Additional fields, getters, setters, and constructors
 
     public PatientInfo() {}
 
-    protected PatientInfo(Long patientSin, String address, String name, String gender, String email, String phone, LocalDate dateOfBirth, String insurance) {
-        this.patientSin = patientSin;
+
+    protected PatientInfo( String address, String name, String gender, String email, String phone, LocalDate dateOfBirth, Representative representative) {
+        this.address = address;
+        this.name = name;
+        this.gender = gender;
+        this.email = email;
+        this.phone = phone;
+        this.dateOfBirth = dateOfBirth;
+        this.representative = representative;
+    }
+
+    protected PatientInfo( String address, String name, String gender, String email, String phone, LocalDate dateOfBirth, String insurance, Representative representative) {
         this.address = address;
         this.name = name;
         this.gender = gender;
@@ -48,13 +68,19 @@ public class PatientInfo {
         this.phone = phone;
         this.dateOfBirth = dateOfBirth;
         this.insurance = insurance;
+        this.representative = representative;
     }
 
-    public static Result<PatientInfo> createPatientInfo(Long patientSin, String address, String name, String gender, String email, String phone, LocalDate dateOfBirth, String insurance) {
-        return Result.Success(new PatientInfo(patientSin, address, name, gender, email, phone, dateOfBirth, insurance));
+    public static Result<PatientInfo> createPatientInfo(String address, String name, String gender, String email, String phone, LocalDate dateOfBirth, String insurance, Representative representative) {
+
+        if (address == null || name == null || gender == null || email == null || phone == null || dateOfBirth == null) {
+            return Result.Failure(null, "One or more required fields are missing.");
+        }
+        // Create and return PatientInfo instance
+        return Result.Success(new PatientInfo(address, name, gender, email, phone, dateOfBirth, insurance, representative));
     }
 
-    public Long getId() {
+    public Integer getId() {
         return patientSin;
     }
 
@@ -79,5 +105,7 @@ public class PatientInfo {
     public String getInsurance() {
         return insurance;
     }
-
+    public Representative getRepresentative() {
+        return representative;
+    }
 }

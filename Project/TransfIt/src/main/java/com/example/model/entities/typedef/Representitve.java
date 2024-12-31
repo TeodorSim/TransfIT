@@ -1,23 +1,20 @@
-package com.example.model.entities.dental;
+package com.example.model.entities.typedef;
 
-import com.example.model.common.Result;
-
-public class Representative {
+public class Representitve {
     private String name;
     private String phone;
     private String email;
     private String relationship;
 
-    public Representative() {}
-    protected Representative(String name, String phone, String email, String relationship) {
+    public Representitve() {}
+
+    protected Representitve(String name, String phone, String email, String relationship) {
         this.name = name;
         this.phone = phone;
         this.email = email;
         this.relationship = relationship;
     }
-    public Result<Representative> createNewRepresentative(String name, String phone, String email, String relationship){
-        return Result.Success(new Representative(name, phone, email, relationship));
-    }
+
     public String getName() {
         return name;
     }

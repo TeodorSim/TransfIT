@@ -8,7 +8,7 @@ CREATE TYPE Representative AS (
 
 -- Patient Info
 CREATE TABLE Patient_info (
-                              patient_sin INTEGER PRIMARY KEY,
+                              patient_sin SERIAL PRIMARY KEY,
                               address VARCHAR(255) NOT NULL,
                               name VARCHAR(255) NOT NULL,
                               gender VARCHAR(1) NOT NULL,
