@@ -1,0 +1,534 @@
+{
+  "name": "Confirmation Email",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 12
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -432,
+        -208
+      ],
+      "id": "fdbc0049-1e0c-47f1-9958-1cf596eb2605",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "6c35bc4b765732a5f7ba9de0e2b1210510d5ece2648638f91730c15705494f54@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Programari"
+        },
+        "returnAll": true,
+        "timeMax": "={{ $now.plus({ day: 1 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        80
+      ],
+      "id": "4b92748e-c296-47cd-9eab-0acfbc9face2",
+      "name": "Get many events",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "c6AcRwwY88POwN3J",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.extractedEmail }}",
+        "subject": "=Confirmare programare vizită stomatologică - {{ $json.extractedDoctor }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; border: 1px solid #eee; padding: 20px; border-radius: 10px;\">\n  <h2 style=\"color: #2c3e50;\">Bună ziua {{ $json.extractedName }},</h2>\n  \n  <p>Vă rugăm să confirmaţi programarea dumneavoastră la clinica noastră.</p>\n  \n  <div style=\"background-color: #f4f7f9; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;\">\n    <p style=\"margin: 5px 0;\"><strong>Serviciu:</strong> {{ $json.extractProcess }}</p>\n    <p style=\"margin: 5px 0;\"><strong>Medic:</strong> {{ $json.extractedDoctor }}</p>\n    <p style=\"margin: 5px 0;\"><strong>Data:</strong> {{ $json.extractDay }}-{{ $json.extractMonth }}-2025</p>\n    <p style=\"margin: 5px 0;\"><strong>Ora:</strong> {{ $json.extractHourMinute }}</p>\n  </div>\n\n<table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" align=\"center\" style=\"margin: 20px auto;\">\n  <tr>\n    <td style=\"border-radius: 5px;\" bgcolor=\"#28a745\">\n      <a href=\"http://localhost:5678/webhook-test/confirmation?action&id={{ $json.extractIdMail}}\" target=\"_blank\" style=\"padding: 10px 20px; color: #ffffff; text-decoration: none; display: inline-block;\">Confirm Programarea</a>\n    </td>\n    <td style=\"width: 20px;\"></td>\n    <td style=\"border-radius: 5px;\" bgcolor=\"#dc3545\">\n      <a href=\"http://localhost:5678/webhook-test/c7502271-58d9-4a1d-975c-4b4dceb98770?id={{ $json.extractIdMail}}\" target=\"_blank\" style=\"padding: 10px 20px; color: #ffffff; text-decoration: none; display: inline-block;\">Anulează</a>\n    </td>\n  </tr>\n</table>\n<p align=\"center\">\n  <a href=\"URL_CALENDLY_SAU_FORMULAR\" style=\"color: #007bff; text-decoration: underline;\">Doresc reprogramare</a>\n</p>\n\n  <p>Așteptăm răspunsul dumneavoatră!</p>\n  \n  <hr style=\"border: 0; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 0.9em; color: #7f8c8d;\">\n    Cu respect,<br>\n    <strong>Echipa {{ $json.extractedDoctor }}</strong>\n  </p>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        352,
+        -192
+      ],
+      "id": "e515a5f7-7fe0-41a5-a71e-a5c16386b0d6",
+      "name": "Send a message",
+      "webhookId": "fab9a247-5eec-4257-9cce-e539bcf8f46f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RZERyQRyD8WNbu4N",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fa28bf9-a323-4eaa-9e14-9ab12a0a0e61",
+              "name": "extractedEmail",
+              "value": "={{ JSON.parse($json.description.replace(/<[^>]*>/g, '')).email}}",
+              "type": "string"
+            },
+            {
+              "id": "2039d840-396b-43c9-80e7-15629c8cb7e0",
+              "name": "extractedName",
+              "value": "={{ JSON.parse($json.description.replace(/<[^>]*>/g, '')).name}}",
+              "type": "string"
+            },
+            {
+              "id": "b1f20c3d-b87d-468d-a62c-f3c9d21720a3",
+              "name": "extractedDoctor",
+              "value": "={{ $json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "0a6f43e3-576a-422a-ba0f-4b34b66d8a6c",
+              "name": "extractProcess",
+              "value": "={{ JSON.parse($json.description.replace(/<[^>]*>/g, '')).process}}",
+              "type": "string"
+            },
+            {
+              "id": "69e63b8e-d802-4462-af03-f6b3a8f8bb38",
+              "name": "extractDay",
+              "value": "={{ $json.start.dateTime.match(/\\d{4}-\\d{2}-(\\d{2})/)[1] }}",
+              "type": "number"
+            },
+            {
+              "id": "deeec08d-5dfc-4564-b72f-52260f921e4f",
+              "name": "extractHourMinute",
+              "value": "={{ $json.start.dateTime.match(/T(\\d{2}:\\d{2})/)[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "132769e0-e9d1-486e-80b0-4752f8c2f575",
+              "name": "extractMonth",
+              "value": "={{ $json.start.dateTime.match(/\\d{4}-(\\d{2})-\\d{2}/)[1] }}",
+              "type": "number"
+            },
+            {
+              "id": "5f6408dc-1eef-4a8f-acb6-826bde3555e9",
+              "name": "extractIdMail",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        144,
+        64
+      ],
+      "id": "4e98250b-ac72-4ed8-8dd3-1acef53469c2",
+      "name": "Fiels JSON"
+    },
+    {
+      "parameters": {
+        "path": "confirmation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -592,
+        240
+      ],
+      "id": "bd81338d-a1c0-4fc2-9946-2b9da42770a5",
+      "name": "Webhook_confirmation",
+      "webhookId": "c7502271-58d9-4a1d-975c-4b4dceb98770"
+    },
+    {
+      "parameters": {
+        "path": "confirmation",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -112,
+        432
+      ],
+      "id": "27f365ca-9379-4aca-a0a8-4be9854a3088",
+      "name": "Webhook_cancellation",
+      "webhookId": "c7502271-58d9-4a1d-975c-4b4dceb98770"
+    },
+    {
+      "parameters": {
+        "path": "c7502271-58d9-4a1d-975c-4b4dceb98770",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -112,
+        624
+      ],
+      "id": "8596571a-56fa-43ce-b912-0345ab7ab82b",
+      "name": "Webhook_reschedule",
+      "webhookId": "c7502271-58d9-4a1d-975c-4b4dceb98770"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "31fe6a1c-a072-49f3-bbd8-d9772b1ff46d",
+              "name": "extractCalendarId",
+              "value": "={{ $json.query.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -352,
+        240
+      ],
+      "id": "91cd7512-506f-4377-9d16-54a1d5d07c94",
+      "name": "Confirmation_node_variables"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        720,
+        240
+      ],
+      "id": "9a9a14b6-f566-48e7-b06d-77eee10d819a",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "calendar": {
+          "__rl": true,
+          "value": "6c35bc4b765732a5f7ba9de0e2b1210510d5ece2648638f91730c15705494f54@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Programari"
+        },
+        "eventId": "={{ $json.extractCalendarId }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        -128,
+        240
+      ],
+      "id": "5026592e-8614-41bc-b13d-910c6c164de6",
+      "name": "Get an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "c6AcRwwY88POwN3J",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "6c35bc4b765732a5f7ba9de0e2b1210510d5ece2648638f91730c15705494f54@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Programari"
+        },
+        "eventId": "={{ $json.id }}",
+        "updateFields": {
+          "color": "10",
+          "summary": "=✅ -  {{ $json.summary }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        96,
+        240
+      ],
+      "id": "bc2d13fe-8a45-4715-8fef-4fe250674e47",
+      "name": "Update an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "c6AcRwwY88POwN3J",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7fa28bf9-a323-4eaa-9e14-9ab12a0a0e61",
+              "name": "extractedEmail",
+              "value": "={{ JSON.parse($json.description.replace(/<[^>]*>/g, '')).email}}",
+              "type": "string"
+            },
+            {
+              "id": "2039d840-396b-43c9-80e7-15629c8cb7e0",
+              "name": "extractedName",
+              "value": "={{ JSON.parse($json.description.replace(/<[^>]*>/g, '')).name}}",
+              "type": "string"
+            },
+            {
+              "id": "b1f20c3d-b87d-468d-a62c-f3c9d21720a3",
+              "name": "extractedDoctor",
+              "value": "={{ $json.summary }}",
+              "type": "string"
+            },
+            {
+              "id": "0a6f43e3-576a-422a-ba0f-4b34b66d8a6c",
+              "name": "extractProcess",
+              "value": "={{ JSON.parse($json.description.replace(/<[^>]*>/g, '')).process}}",
+              "type": "string"
+            },
+            {
+              "id": "69e63b8e-d802-4462-af03-f6b3a8f8bb38",
+              "name": "extractDay",
+              "value": "={{ $json.start.dateTime.match(/\\d{4}-\\d{2}-(\\d{2})/)[1] }}",
+              "type": "number"
+            },
+            {
+              "id": "deeec08d-5dfc-4564-b72f-52260f921e4f",
+              "name": "extractHourMinute",
+              "value": "={{ $json.start.dateTime.match(/T(\\d{2}:\\d{2})/)[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "132769e0-e9d1-486e-80b0-4752f8c2f575",
+              "name": "extractMonth",
+              "value": "={{ $json.start.dateTime.match(/\\d{4}-(\\d{2})-\\d{2}/)[1] }}",
+              "type": "number"
+            },
+            {
+              "id": "5f6408dc-1eef-4a8f-acb6-826bde3555e9",
+              "name": "extractIdMail",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        240
+      ],
+      "id": "9f167392-86f2-4794-8057-21416f4031c1",
+      "name": "Fiels JSON1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.extractedEmail }}",
+        "subject": "=Vizită stomatologică confirmată - {{ $json.extractedDoctor }}",
+        "message": "=<div style=\"font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; border: 1px solid #eee; padding: 20px; border-radius: 10px;\">\n  <h2 style=\"color: #2c3e50;\">Bună ziua {{ $json.extractedName }},</h2>\n  \n  <p>Programarea dumneavoastră a fost confirmată la clinica noastră!</p>\n  \n  <div style=\"background-color: #f4f7f9; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;\">\n    <p style=\"margin: 5px 0;\"><strong>Serviciu:</strong> {{ $json.extractProcess }}</p>\n    <p style=\"margin: 5px 0;\"><strong>Medic:</strong> {{ $json.extractedDoctor }}</p>\n    <p style=\"margin: 5px 0;\"><strong>Data:</strong> {{ $json.extractDay }}-{{ $json.extractMonth }}-2025</p>\n    <p style=\"margin: 5px 0;\"><strong>Ora:</strong> {{ $json.extractHourMinute }}</p>\n  </div>\n\n  <p>Vă așteptăm cu drag!</p>\n  \n  <hr style=\"border: 0; border-top: 1px solid #eee; margin: 20px 0;\">\n  <p style=\"font-size: 0.9em; color: #7f8c8d;\">\n    Cu respect,<br>\n    <strong>Echipa {{ $json.extractedDoctor }}</strong>\n  </p>\n</div>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        240
+      ],
+      "id": "4de24490-6e9b-4aa7-bb7e-e992e21b0bd3",
+      "name": "Send a message1",
+      "webhookId": "fab9a247-5eec-4257-9cce-e539bcf8f46f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RZERyQRyD8WNbu4N",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ec52ce59-6ab8-4b71-a7f2-8f79fe2ffd87",
+              "leftValue": "={{ $json.summary }}",
+              "rightValue": "✅ CONFIRMAT -",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "59d332fb-6806-43e5-a7e1-2468ac275a36",
+              "leftValue": "={{ $json.summary }}",
+              "rightValue": "✅ -",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -16,
+        -176
+      ],
+      "id": "b7d60bbf-8d44-4be4-b7b0-4e68b56e5a09",
+      "name": "Filter"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fiels JSON": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook_confirmation": {
+      "main": [
+        [
+          {
+            "node": "Confirmation_node_variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmation_node_variables": {
+      "main": [
+        [
+          {
+            "node": "Get an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get an event": {
+      "main": [
+        [
+          {
+            "node": "Update an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event": {
+      "main": [
+        [
+          {
+            "node": "Fiels JSON1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fiels JSON1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Fiels JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b70d1b82-773e-46bc-bcb5-3d33d3261652",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ed9e9fc64f4eece9ce4d9c3201fd49dad6ee1b14bbffc2a0ffc0414a8cd0422e"
+  },
+  "id": "AziQHy0VIC37SOR4",
+  "tags": []
+}
