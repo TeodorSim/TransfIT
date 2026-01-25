@@ -13,6 +13,8 @@ services:
       - POSTGRES_DB
       - POSTGRES_NON_ROOT_USER
       - POSTGRES_NON_ROOT_PASSWORD
+    # Port 5432 NOT exposed to host for security
+    # Access only through Docker network or docker-compose exec
     volumes:
       - db_storage:/var/lib/postgresql/data
       - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh
@@ -41,3 +43,32 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  factory-service:
+    build: ../../../FactoryModel
+    restart: always
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - N8N_API_KEY=${N8N_API_KEY}
+      - N8N_BASE_URL=http://n8n:5678
+      - COOKIE_SECRET=${COOKIE_SECRET}
+    ports:
+      - 3000:3000
+    links:
+      - postgres
+      - n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+      n8n:
+        condition: service_started

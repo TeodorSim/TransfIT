@@ -1,0 +1,136 @@
+{
+  "name": "Clinic Workflow - TEMPLATE",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 9 * * *"}]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+        "authentication": "oAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "timeMin", "value": "={{ $now.toISO() }}"},
+            {"name": "timeMax", "value": "={{ $now.plus({ days: 1 }).toISO() }}"},
+            {"name": "singleEvents", "value": "true"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-calendar",
+      "name": "HTTP - Get Calendar Events",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [470, 300],
+      "credentials": {
+        "oAuth2Api": {"id": "CREDENTIAL_ID_PLACEHOLDER"}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse calendar events\nconst items = [];\nconst events = $input.item.json.items || [];\n\nfor (const event of events) {\n  let clinicId = 'clinic_default';\n  if (event.description) {\n    const match = event.description.match(/ClinicID:\\\\s*(\\\\S+)/);\n    if (match) clinicId = match[1];\n  }\n  \n  items.push({\n    eventId: event.id,\n    eventSummary: event.summary,\n    eventStart: event.start?.dateTime || event.start?.date,\n    clinicId: clinicId\n  });\n}\n\nreturn items;"
+      },
+      "id": "code-node",
+      "name": "Parse Event Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  a.id,\n  p.id as patient_id,\n  pgp_sym_decrypt(p.nume_encrypted, '{{ $env.ENCRYPTION_KEY }}') as nume,\n  pgp_sym_decrypt(p.prenume_encrypted, '{{ $env.ENCRYPTION_KEY }}') as prenume,\n  pgp_sym_decrypt(p.email_encrypted, '{{ $env.ENCRYPTION_KEY }}') as email,\n  a.data_programare,\n  a.ora_start\nFROM appointments a\nJOIN patients p ON a.patient_id = p.id\nWHERE a.google_event_id = '{{ $json.eventId }}' AND a.clinic_id = '{{ $json.clinicId }}'",
+        "options": {}
+      },
+      "id": "postgres-query",
+      "name": "Postgres - Get Patient",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [910, 300],
+      "credentials": {"postgres": {"id": "postgres-default"}}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [{"value1": "={{ $json.email }}", "operation": "isNotEmpty"}]
+        }
+      },
+      "id": "if-node",
+      "name": "Check If Email Exists",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "oAuth2",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "raw",
+              "value": "={{ $base64encode('To: ' + $json.email + '\\nSubject: Appointment Reminder\\n\\nDear ' + $json.prenume + ' ' + $json.nume + ',\\n\\nThis is a reminder for your appointment tomorrow on ' + $json.data_programare + ' at ' + $json.ora_start + '.\\n\\nBest regards,\\nYour Clinic Team') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-gmail",
+      "name": "HTTP - Send Gmail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1350, 200],
+      "credentials": {
+        "oAuth2Api": {"id": "CREDENTIAL_ID_PLACEHOLDER"}
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {"name": "status", "value": "no_email"},
+            {"name": "patient_name", "value": "={{ $json.prenume }} {{ $json.nume }}"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-node",
+      "name": "No Email - Skip",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1350, 400]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {"main": [[{"node": "HTTP - Get Calendar Events", "type": "main", "index": 0}]]},
+    "HTTP - Get Calendar Events": {"main": [[{"node": "Parse Event Data", "type": "main", "index": 0}]]},
+    "Parse Event Data": {"main": [[{"node": "Postgres - Get Patient", "type": "main", "index": 0}]]},
+    "Postgres - Get Patient": {"main": [[{"node": "Check If Email Exists", "type": "main", "index": 0}]]},
+    "Check If Email Exists": {
+      "main": [
+        [{"node": "HTTP - Send Gmail", "type": "main", "index": 0}],
+        [{"node": "No Email - Skip", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1",
+  "id": "TEMPLATE",
+  "meta": {"instanceId": "factory-template"},
+  "tags": []
+}
