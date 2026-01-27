@@ -141,13 +141,31 @@ class HomepageManager {
 
     // Căutare programare pacient (API PostgreSQL)
     async searchPatientAppointment(patientName, bannerEl) {
-        const API_URL = 'http://localhost:8000';
+        const API_URL = 'https://transfit.site/n8n/webhook-test/verificare-pacient';
+
+        // 1. Split 'name surname' into components
+        const nameParts = patientName.trim().split(/\s+/);
+        const rawNume = nameParts[0] || '';
+        const rawPrenume = nameParts.slice(1).join(' ') || '';
+        const ts = Date.now();
         
+        // 2. Create the data string to encrypt
+        const dataString = `nume=${rawNume}&prenume=${rawPrenume}&ts=${ts}`;
+        const encryptedData = await encryptRSA(dataString);
+
         // Afișează loading
         bannerEl.innerHTML = `<strong>Se caută...</strong> ${patientName}`;
+        const url_decoded=API_URL+`?data=${encodeURIComponent(encryptedData)}`;
         
         try {
-            const response = await fetch(`${API_URL}/api/appointments/search/${encodeURIComponent(patientName)}`);
+            // 3. Send POST request with encrypted data
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ data: encryptedData })
+            });
             
             if (!response.ok) {
                 if (response.status === 404) {
@@ -162,22 +180,49 @@ class HomepageManager {
             }
             
             const data = await response.json();
-            const lastApt = data.last_appointment;
             
-            // Afișează ultima programare
-            const dateFormatted = new Date(lastApt.date).toLocaleDateString('ro-RO', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
+            // Check if success and has history data
+            if (!data.success || !data.history || data.history.length === 0) {
+                bannerEl.innerHTML = `
+                    <strong>Pacient:</strong> ${patientName}<br>
+                    <span style="color: #ef4444;">Nu s-au găsit programări.</span>
+                `;
+                this.showNotification('Nu s-au găsit programări pentru acest pacient', 'info');
+                return;
+            }
+            
+            // Build HTML for all appointments
+            let appointmentsHTML = `<strong>Găsite ${data.count} programare/programări:</strong><br><br>`;
+            
+            data.history.forEach((appointment, index) => {
+                const dateFormatted = new Date(appointment.data_programare).toLocaleDateString('ro-RO', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                const timeFormatted = appointment.ora_start ? appointment.ora_start.substring(0, 5) : 'N/A';
+                
+                const medicFormatted = appointment.cabinet_medic
+                    .toString()
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                
+                const details = appointment.info_relevante ? appointment.info_relevante : 'Nu au fost înregistrate alte detalii.';
+                
+                appointmentsHTML += `
+                    <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(229, 231, 235, 0.3);">
+                        <strong>Programare ${index + 1}:</strong><br>
+                        <strong>Data:</strong> ${dateFormatted} la ${timeFormatted}<br>
+                        <strong>Medic:</strong> ${medicFormatted}<br>
+                        <strong>Detalii:</strong> ${details}<br>
+                    </div>
+                `;
             });
             
-            bannerEl.innerHTML = `
-                <strong>Pacient:</strong> ${data.patient_name}<br>
-                <strong>Data:</strong> ${dateFormatted} la ${lastApt.time}<br>
-                <strong>Detalii:</strong> ${lastApt.details}
-            `;
-            
-            this.showNotification(`Găsit: ${data.total_appointments} programare/programări`, 'success');
+            bannerEl.innerHTML = appointmentsHTML;
+            this.showNotification(`Găsite ${data.count} programare/programări`, 'success');
             
         } catch (error) {
             console.error('Eroare la căutarea programării:', error);
@@ -188,6 +233,7 @@ class HomepageManager {
             this.showNotification('Eroare de conexiune la API', 'error');
         }
     }
+
 
     // Sistem de notificări
     showNotification(message, type = 'info') {
