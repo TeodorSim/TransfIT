@@ -1,67 +1,131 @@
--- This table stores the n8n integration metadata for each clinic.
--- Security: Uses pgcrypto for symmetric encryption of sensitive tokens.==
 
--- Enable Encryption Extension (if not already enabled)
+
+-- Database: artegor_clinic_db
+-- Owner: admin_artegor
+
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Create the Clinic Integrations Table
-CREATE TABLE IF NOT EXISTS clinic_integrations (
-    -- Primary Key: Clinic Identifier (Text, Unique)
-    clinic_id TEXT PRIMARY KEY,
+-- Table: pacienti_programari
+-- Purpose: Store patient appointments with encrypted PII and blind indices
+CREATE TABLE pacienti_programari (
+    id SERIAL PRIMARY KEY,
     
-    -- Encrypted Refresh Token (BYTEA for encrypted storage)
-    -- Use pgp_sym_encrypt() to store, pgp_sym_decrypt() to retrieve
-    google_refresh_token BYTEA NOT NULL,
+    tally_id VARCHAR(100) UNIQUE NOT NULL,
+    calendar_event_id VARCHAR(255),
     
-    -- n8n Workflow ID (returned from POST /workflows)
-    n8n_workflow_id TEXT NOT NULL,
+    data_programare DATE NOT NULL,
+    ora_start TIME NOT NULL,
+    ora_final TIME NOT NULL,
+    tip_vizita VARCHAR(100),
+    cabinet_medic VARCHAR(100) NOT NULL,
+    are_trimitere BOOLEAN DEFAULT FALSE,
+    status_confirmare VARCHAR(50) DEFAULT 'neconfirmat',  
     
-    -- n8n Credential ID (returned from POST /credentials)
-    n8n_credential_id TEXT NOT NULL,
+    -- Blind indices (HASHED for searching without decryption)
+    -- SHA256 hex hashes of normalized (lowercase, trimmed) values
+    nume_hash VARCHAR(64) NOT NULL,                  
+    prenume_hash VARCHAR(64) NOT NULL,               
+    telefon_hash VARCHAR(64) NOT NULL,               
     
-    -- Timestamp when the integration was created
+    -- Encrypted PII (BYTEA for maximum security)
+    -- Encrypted using pgcrypto with application-provided key
+    nume BYTEA NOT NULL,                           
+    prenume BYTEA NOT NULL,                        
+    telefon BYTEA NOT NULL,                         
+    email BYTEA,                                     
+    info_relevante BYTEA,                          
+    alte_info_optionale BYTEA,                       
+    
+    -- Audit fields
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    -- Optional: Last sync timestamp for monitoring
-    last_synced_at TIMESTAMP,
-    
-    -- Optional: Status for lifecycle management
-    status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'error'))
+    -- Constraints
+    CONSTRAINT valid_time_range CHECK (ora_start < ora_final),
+    CONSTRAINT valid_status CHECK (status_confirmare IN ('neconfirmat', 'confirmat', 'anulat'))
 );
 
--- Create Index for Performance
-CREATE INDEX IF NOT EXISTS idx_clinic_integrations_status 
-    ON clinic_integrations(status);
+-- Indices for performance optimization
+CREATE INDEX idx_pacienti_data_programare ON pacienti_programari(data_programare);
+CREATE INDEX idx_pacienti_cabinet_medic ON pacienti_programari(cabinet_medic);
+CREATE INDEX idx_pacienti_telefon_hash ON pacienti_programari(telefon_hash);
+CREATE INDEX idx_pacienti_nume_prenume_hash ON pacienti_programari(nume_hash, prenume_hash);
+CREATE INDEX idx_pacienti_status ON pacienti_programari(status_confirmare);
+CREATE INDEX idx_pacienti_calendar_event ON pacienti_programari(calendar_event_id);
 
-CREATE INDEX IF NOT EXISTS idx_clinic_integrations_created_at 
-    ON clinic_integrations(created_at DESC);
+-- Composite index for conflict detection queries
+CREATE INDEX idx_pacienti_conflict_check ON pacienti_programari(
+    cabinet_medic, 
+    data_programare, 
+    ora_start, 
+    ora_final
+) WHERE status_confirmare != 'anulat';
 
 
--- EXAMPLE: How to Insert Data (with Encryption)
--- INSERT INTO clinic_integrations (
---     clinic_id, 
---     google_refresh_token, 
---     n8n_workflow_id, 
---     n8n_credential_id
--- )
--- VALUES (
---     'clinic_12345',
---     pgp_sym_encrypt('1//refresh_token_here', $env.ENCRYPTION_KEY),
---     'n8n_workflow_67890',
---     'n8n_cred_11111'
--- );
+-- Table: doctor_availability
+-- Purpose: Block off time slots when doctors are unavailable
+CREATE TABLE doctor_availability (
+    id SERIAL PRIMARY KEY,
+    
+    -- Availability information
+    cabinet_medic VARCHAR(100) NOT NULL,             
+    start_time TIMESTAMP NOT NULL,                  
+    end_time TIMESTAMP NOT NULL,                    
+    reason VARCHAR(255),                             
+    calendar_event_id VARCHAR(255),                  
+    
+    -- Audit fields
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Constraints
+    CONSTRAINT valid_availability_range CHECK (start_time < end_time)
+);
 
--- EXAMPLE: How to Query Encrypted Data
--- SELECT 
---     clinic_id,
---     pgp_sym_decrypt(google_refresh_token, $env.ENCRYPTION_KEY) as refresh_token,
---     n8n_workflow_id,
---     n8n_credential_id,
---     created_at
--- FROM clinic_integrations
--- WHERE clinic_id = 'clinic_12345';
+-- Indices for performance optimization
+CREATE INDEX idx_availability_cabinet ON doctor_availability(cabinet_medic);
+CREATE INDEX idx_availability_time_range ON doctor_availability(start_time, end_time);
+CREATE INDEX idx_availability_calendar_event ON doctor_availability(calendar_event_id);
 
--- EXAMPLE: Update Last Sync Timestamp
--- UPDATE clinic_integrations 
--- SET last_synced_at = CURRENT_TIMESTAMP 
--- WHERE clinic_id = 'clinic_12345';
+-- Composite index for conflict detection queries
+CREATE INDEX idx_availability_conflict_check ON doctor_availability(
+    cabinet_medic,
+    start_time,
+    end_time
+);
+
+-- Permissions
+GRANT ALL PRIVILEGES ON TABLE pacienti_programari TO admin_artegor;
+GRANT ALL PRIVILEGES ON TABLE doctor_availability TO admin_artegor;
+GRANT USAGE, SELECT ON SEQUENCE pacienti_programari_id_seq TO admin_artegor;
+GRANT USAGE, SELECT ON SEQUENCE doctor_availability_id_seq TO admin_artegor;
+
+
+-- Function to normalize text for hashing (lowercase, trim)
+CREATE OR REPLACE FUNCTION normalize_for_hash(input_text TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN LOWER(TRIM(input_text));
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Function to create SHA256 hash
+CREATE OR REPLACE FUNCTION create_blind_index(input_text TEXT)
+RETURNS VARCHAR(64) AS $$
+BEGIN
+    RETURN ENCODE(DIGEST(normalize_for_hash(input_text), 'sha256'), 'hex');
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- Comments for documentation
+COMMENT ON TABLE pacienti_programari IS 'Patient appointments with encrypted PII and blind indices for searching';
+COMMENT ON TABLE doctor_availability IS 'Doctor unavailability blocks for conflict detection';
+
+COMMENT ON COLUMN pacienti_programari.nume_hash IS 'SHA256 hash of normalized last name for blind index searching';
+COMMENT ON COLUMN pacienti_programari.prenume_hash IS 'SHA256 hash of normalized first name for blind index searching';
+COMMENT ON COLUMN pacienti_programari.telefon_hash IS 'SHA256 hash of normalized phone number for blind index searching';
+
+COMMENT ON COLUMN pacienti_programari.nume IS 'AES encrypted last name (BYTEA) - decrypt with application key';
+COMMENT ON COLUMN pacienti_programari.prenume IS 'AES encrypted first name (BYTEA) - decrypt with application key';
+COMMENT ON COLUMN pacienti_programari.telefon IS 'AES encrypted phone number (BYTEA) - decrypt with application key';
