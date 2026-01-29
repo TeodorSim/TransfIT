@@ -1,0 +1,130 @@
+{
+  "name": "Artegor Clinic - Test with Variables",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {"name": "tally_id", "value": "tally_vars_001"},
+            {"name": "calendar_event_id", "value": "gcal_vars_001"},
+            {"name": "data_programare", "value": "2026-03-01"},
+            {"name": "ora_start", "value": "14:00:00"},
+            {"name": "ora_final", "value": "15:00:00"},
+            {"name": "tip_vizita", "value": "Consultatie"},
+            {"name": "cabinet_medic", "value": "Dr. Maria Ionescu"},
+            {"name": "nume", "value": "Georgescu"},
+            {"name": "prenume", "value": "Maria"},
+            {"name": "telefon", "value": "+40745123456"},
+            {"name": "email", "value": "maria.georgescu@test.ro"},
+            {"name": "info_relevante", "value": "Test cu variabile n8n"},
+            {"name": "are_trimitere", "value": "false"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-patient-data",
+      "name": "Set Patient Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SECURITY VALIDATION FOR PATIENT DATA\n// Prevents SQL injection and validates data formats\n\nconst item = $input.item.json;\n\n// 1. CHECK FOR SQL INJECTION PATTERNS\nconst sqlInjectionPatterns = [\n  /('|(\\-\\-)|(;)|(\\|\\|)|(\\*))/gi,  // Single quotes, comments, semicolons\n  /(\\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\\b)/gi  // SQL keywords\n];\n\nfunction containsSqlInjection(value) {\n  if (!value) return false;\n  return sqlInjectionPatterns.some(pattern => pattern.test(value));\n}\n\n// 2. VALIDATE REQUIRED FIELDS\nconst required = ['tally_id', 'calendar_event_id', 'data_programare', 'ora_start', 'ora_final', 'nume', 'prenume', 'telefon'];\nfor (const field of required) {\n  if (!item[field] || item[field].trim() === '') {\n    throw new Error(`Required field missing: ${field}`);\n  }\n}\n\n// 3. VALIDATE DATA FORMATS\n// Date format: YYYY-MM-DD\nif (!/^\\d{4}-\\d{2}-\\d{2}$/.test(item.data_programare)) {\n  throw new Error('Invalid date format. Use YYYY-MM-DD');\n}\n\n// Time format: HH:MM:SS\nif (!/^\\d{2}:\\d{2}:\\d{2}$/.test(item.ora_start) || !/^\\d{2}:\\d{2}:\\d{2}$/.test(item.ora_final)) {\n  throw new Error('Invalid time format. Use HH:MM:SS');\n}\n\n// Phone: Romanian format +407xxxxxxxx (10 digits after +40)\nif (!/^\\+407\\d{8}$/.test(item.telefon)) {\n  throw new Error('Invalid phone format. Use +407xxxxxxxx');\n}\n\n// Email: basic validation\nif (item.email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(item.email)) {\n  throw new Error('Invalid email format');\n}\n\n// 4. CHECK FOR SQL INJECTION IN TEXT FIELDS\nconst textFields = ['tally_id', 'calendar_event_id', 'nume', 'prenume', 'tip_vizita', 'cabinet_medic', 'info_relevante'];\nfor (const field of textFields) {\n  if (containsSqlInjection(item[field])) {\n    throw new Error(`Potential SQL injection detected in ${field}`);\n  }\n}\n\n// 5. LENGTH RESTRICTIONS\nif (item.nume.length > 100 || item.prenume.length > 100) {\n  throw new Error('Name fields too long (max 100 chars)');\n}\n\nif (item.info_relevante && item.info_relevante.length > 500) {\n  throw new Error('Info relevante too long (max 500 chars)');\n}\n\n// 6. SANITIZE: Replace dangerous characters\nfunction sanitize(value) {\n  if (!value) return value;\n  // Replace single quotes with safe equivalent (for display, not for SQL)\n  return value.replace(/'/g, \"'\");\n}\n\n// Return sanitized data\nreturn {\n  json: {\n    ...item,\n    nume: sanitize(item.nume),\n    prenume: sanitize(item.prenume),\n    info_relevante: sanitize(item.info_relevante || ''),\n    validation_passed: true,\n    validated_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ `INSERT INTO pacienti_programari (tally_id, calendar_event_id, data_programare, ora_start, ora_final, tip_vizita, cabinet_medic, are_trimitere, status_confirmare, nume_hash, prenume_hash, telefon_hash, nume, prenume, telefon, email, info_relevante) VALUES ('${$json.tally_id}', '${$json.calendar_event_id}', '${$json.data_programare}', '${$json.ora_start}', '${$json.ora_final}', '${$json.tip_vizita}', '${$json.cabinet_medic}', ${$json.are_trimitere}, 'neconfirmat', encode(digest(lower(trim('${$json.nume}')), 'sha256'), 'hex'), encode(digest(lower(trim('${$json.prenume}')), 'sha256'), 'hex'), encode(digest(lower(trim('${$json.telefon}')), 'sha256'), 'hex'), pgp_sym_encrypt('${$json.nume}', '${$env.ENCRYPTION_KEY}'), pgp_sym_encrypt('${$json.prenume}', '${$env.ENCRYPTION_KEY}'), pgp_sym_encrypt('${$json.telefon}', '${$env.ENCRYPTION_KEY}'), pgp_sym_encrypt('${$json.email}', '${$env.ENCRYPTION_KEY}'), pgp_sym_encrypt('${$json.info_relevante}', '${$env.ENCRYPTION_KEY}')) RETURNING id, tally_id, status_confirmare;` }}"
+      },
+      "id": "insert-appointment",
+      "name": "1. Insert with Variables",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [800, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ `SELECT id, tally_id, data_programare, ora_start, ora_final, cabinet_medic, pgp_sym_decrypt(nume, '${$env.ENCRYPTION_KEY}') as nume, pgp_sym_decrypt(prenume, '${$env.ENCRYPTION_KEY}') as prenume, pgp_sym_decrypt(telefon, '${$env.ENCRYPTION_KEY}') as telefon, pgp_sym_decrypt(email, '${$env.ENCRYPTION_KEY}') as email FROM pacienti_programari WHERE tally_id = '${$('Set Patient Data').item.json.tally_id}';` }}"
+      },
+      "id": "get-by-tally",
+      "name": "2. Get by Tally ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ `SELECT id, tally_id, calendar_event_id, data_programare, ora_start, ora_final, tip_vizita, cabinet_medic, status_confirmare, pgp_sym_decrypt(nume, '${$env.ENCRYPTION_KEY}') as nume, pgp_sym_decrypt(prenume, '${$env.ENCRYPTION_KEY}') as prenume, pgp_sym_decrypt(telefon, '${$env.ENCRYPTION_KEY}') as telefon, pgp_sym_decrypt(email, '${$env.ENCRYPTION_KEY}') as email FROM pacienti_programari WHERE telefon_hash = encode(digest(lower(trim('${$('Set Patient Data').item.json.telefon}')), 'sha256'), 'hex') AND status_confirmare != 'anulat' ORDER BY data_programare DESC LIMIT 1;` }}"
+      },
+      "id": "find-by-phone",
+      "name": "3. Find by Phone",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ `UPDATE pacienti_programari SET status_confirmare = 'confirmat', updated_at = CURRENT_TIMESTAMP WHERE tally_id = '${$('Set Patient Data').item.json.tally_id}' AND status_confirmare = 'neconfirmat' RETURNING id, pgp_sym_decrypt(nume, '${$env.ENCRYPTION_KEY}') as nume, pgp_sym_decrypt(prenume, '${$env.ENCRYPTION_KEY}') as prenume, data_programare, ora_start;` }}"
+      },
+      "id": "confirm",
+      "name": "4. Confirm Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ `DELETE FROM pacienti_programari WHERE tally_id = '${$('Set Patient Data').item.json.tally_id}' RETURNING id, tally_id;` }}"
+      },
+      "id": "cleanup",
+      "name": "5. Cleanup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1450, 400]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{"node": "Set Patient Data", "type": "main", "index": 0}]]
+    },
+    "Set Patient Data": {
+      "main": [[{"node": "Validate Input", "type": "main", "index": 0}]]
+    },
+    "Validate Input": {
+      "main": [[{"node": "1. Insert with Variables", "type": "main", "index": 0}]]
+    },
+    "1. Insert with Variables": {
+      "main": [[{"node": "2. Get by Tally ID", "type": "main", "index": 0}]]
+    },
+    "2. Get by Tally ID": {
+      "main": [[{"node": "3. Find by Phone", "type": "main", "index": 0}]]
+    },
+    "3. Find by Phone": {
+      "main": [[{"node": "4. Confirm Appointment", "type": "main", "index": 0}]]
+    },
+    "4. Confirm Appointment": {
+      "main": [[{"node": "5. Cleanup", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {}
+}

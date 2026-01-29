@@ -1,0 +1,196 @@
+{
+  "name": "Artegor Clinic - Complete SQL Test Suite",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pacienti_programari (\n    tally_id, calendar_event_id, data_programare, ora_start, ora_final,\n    tip_vizita, cabinet_medic, are_trimitere, status_confirmare,\n    nume_hash, prenume_hash, telefon_hash,\n    nume, prenume, telefon, email, info_relevante\n) VALUES (\n    'tally_full_001', 'gcal_full_001', '2026-02-25', '10:00:00', '11:00:00',\n    'Consultatie', 'Dr. Maria Ionescu', false, 'neconfirmat',\n    encode(digest(lower(trim('Popescu')), 'sha256'), 'hex'),\n    encode(digest(lower(trim('Alexandru')), 'sha256'), 'hex'),\n    encode(digest(lower(trim('+40723456789')), 'sha256'), 'hex'),\n    pgp_sym_encrypt('Popescu', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('Alexandru', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('+40723456789', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('alex.popescu@test.ro', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('Prima programare test', '{{$env.ENCRYPTION_KEY}}')\n) RETURNING id, tally_id, status_confirmare;"
+      },
+      "id": "insert-1",
+      "name": "1. Insert Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, tally_id, data_programare, ora_start, ora_final, cabinet_medic,\n    pgp_sym_decrypt(nume, '{{$env.ENCRYPTION_KEY}}') as nume,\n    pgp_sym_decrypt(prenume, '{{$env.ENCRYPTION_KEY}}') as prenume,\n    pgp_sym_decrypt(telefon, '{{$env.ENCRYPTION_KEY}}') as telefon\nFROM pacienti_programari WHERE tally_id = 'tally_full_001';"
+      },
+      "id": "get-by-tally",
+      "name": "2. Get by Tally ID",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    id, tally_id, calendar_event_id, data_programare, ora_start, ora_final,\n    tip_vizita, cabinet_medic, status_confirmare, created_at,\n    pgp_sym_decrypt(nume, '{{$env.ENCRYPTION_KEY}}') as nume,\n    pgp_sym_decrypt(prenume, '{{$env.ENCRYPTION_KEY}}') as prenume,\n    pgp_sym_decrypt(telefon, '{{$env.ENCRYPTION_KEY}}') as telefon,\n    pgp_sym_decrypt(email, '{{$env.ENCRYPTION_KEY}}') as email\nFROM pacienti_programari \nWHERE telefon_hash = encode(digest(lower(trim('+40723456789')), 'sha256'), 'hex')\n  AND status_confirmare != 'anulat'\nORDER BY data_programare DESC LIMIT 1;"
+      },
+      "id": "find-by-phone",
+      "name": "3. Find by Phone",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH conflict_check AS (\n    SELECT COUNT(*) as conflicts\n    FROM pacienti_programari\n    WHERE cabinet_medic = 'Dr. Maria Ionescu'\n      AND data_programare = '2026-02-25'\n      AND status_confirmare != 'anulat'\n      AND ('11:30:00'::TIME < ora_final AND '12:30:00'::TIME > ora_start)\n    UNION ALL\n    SELECT COUNT(*) as conflicts\n    FROM doctor_availability\n    WHERE cabinet_medic = 'Dr. Maria Ionescu'\n      AND DATE(start_time) = '2026-02-25'\n      AND ('11:30:00'::TIME < end_time::TIME AND '12:30:00'::TIME > start_time::TIME)\n)\nSELECT \n    COALESCE(SUM(conflicts), 0) as conflict_count,\n    CASE \n        WHEN COALESCE(SUM(conflicts), 0) > 0 THEN false\n        ELSE true\n    END as is_available\nFROM conflict_check;"
+      },
+      "id": "conflict-check-pass",
+      "name": "4. Conflict Check (Pass)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO doctor_availability (\n    cabinet_medic, start_time, end_time, reason, calendar_event_id\n) VALUES (\n    'Dr. Maria Ionescu',\n    '2026-02-25 13:00:00',\n    '2026-02-25 14:00:00',\n    'Pauza de masa',\n    'gcal_break_001'\n) RETURNING id, cabinet_medic, start_time, end_time;"
+      },
+      "id": "insert-block",
+      "name": "5. Insert Doctor Block",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH conflict_check AS (\n    SELECT COUNT(*) as conflicts\n    FROM pacienti_programari\n    WHERE cabinet_medic = 'Dr. Maria Ionescu'\n      AND data_programare = '2026-02-25'\n      AND status_confirmare != 'anulat'\n      AND ('13:15:00'::TIME < ora_final AND '13:45:00'::TIME > ora_start)\n    UNION ALL\n    SELECT COUNT(*) as conflicts\n    FROM doctor_availability\n    WHERE cabinet_medic = 'Dr. Maria Ionescu'\n      AND DATE(start_time) = '2026-02-25'\n      AND ('13:15:00'::TIME < end_time::TIME AND '13:45:00'::TIME > start_time::TIME)\n)\nSELECT \n    COALESCE(SUM(conflicts), 0) as conflict_count,\n    CASE \n        WHEN COALESCE(SUM(conflicts), 0) > 0 THEN false\n        ELSE true\n    END as is_available\nFROM conflict_check;"
+      },
+      "id": "conflict-check-fail",
+      "name": "6. Conflict Check (Fail)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    id, data_programare, ora_start, ora_final, tip_vizita, status_confirmare,\n    pgp_sym_decrypt(nume, '{{$env.ENCRYPTION_KEY}}') as nume,\n    pgp_sym_decrypt(prenume, '{{$env.ENCRYPTION_KEY}}') as prenume,\n    pgp_sym_decrypt(telefon, '{{$env.ENCRYPTION_KEY}}') as telefon\nFROM pacienti_programari \nWHERE cabinet_medic = 'Dr. Maria Ionescu'\n  AND data_programare = '2026-02-25'\n  AND status_confirmare != 'anulat'\nORDER BY ora_start;"
+      },
+      "id": "daily-schedule",
+      "name": "7. Daily Schedule",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    id, tally_id, data_programare, ora_start, cabinet_medic,\n    pgp_sym_decrypt(nume, '{{$env.ENCRYPTION_KEY}}') as nume,\n    pgp_sym_decrypt(prenume, '{{$env.ENCRYPTION_KEY}}') as prenume,\n    pgp_sym_decrypt(telefon, '{{$env.ENCRYPTION_KEY}}') as telefon,\n    pgp_sym_decrypt(email, '{{$env.ENCRYPTION_KEY}}') as email\nFROM pacienti_programari \nWHERE status_confirmare = 'neconfirmat'\n  AND data_programare >= CURRENT_DATE\n  AND data_programare <= CURRENT_DATE + INTERVAL '7 days'\nORDER BY data_programare, ora_start;"
+      },
+      "id": "pending-confirmations",
+      "name": "8. Pending Confirmations",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pacienti_programari\nSET status_confirmare = 'confirmat', updated_at = CURRENT_TIMESTAMP\nWHERE tally_id = 'tally_full_001' AND status_confirmare = 'neconfirmat'\nRETURNING \n    id,\n    pgp_sym_decrypt(nume, '{{$env.ENCRYPTION_KEY}}') as nume,\n    pgp_sym_decrypt(prenume, '{{$env.ENCRYPTION_KEY}}') as prenume,\n    data_programare, ora_start;"
+      },
+      "id": "confirm",
+      "name": "9. Confirm Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pacienti_programari (\n    tally_id, calendar_event_id, data_programare, ora_start, ora_final,\n    tip_vizita, cabinet_medic, are_trimitere, status_confirmare,\n    nume_hash, prenume_hash, telefon_hash,\n    nume, prenume, telefon, email, info_relevante\n) VALUES (\n    'tally_cancel_001', 'gcal_cancel_001', '2026-02-26', '15:00:00', '16:00:00',\n    'Urgenta', 'Dr. Maria Ionescu', true, 'neconfirmat',\n    encode(digest(lower(trim('Marinescu')), 'sha256'), 'hex'),\n    encode(digest(lower(trim('Elena')), 'sha256'), 'hex'),\n    encode(digest(lower(trim('+40734567890')), 'sha256'), 'hex'),\n    pgp_sym_encrypt('Marinescu', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('Elena', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('+40734567890', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('elena.m@test.ro', '{{$env.ENCRYPTION_KEY}}'),\n    pgp_sym_encrypt('Pentru test anulare', '{{$env.ENCRYPTION_KEY}}')\n) RETURNING id, tally_id, status_confirmare;"
+      },
+      "id": "insert-2",
+      "name": "10. Insert 2nd Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 700]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pacienti_programari\nSET status_confirmare = 'anulat', updated_at = CURRENT_TIMESTAMP\nWHERE tally_id = 'tally_cancel_001'\nRETURNING \n    id, calendar_event_id,\n    pgp_sym_decrypt(email, '{{$env.ENCRYPTION_KEY}}') as email;"
+      },
+      "id": "cancel",
+      "name": "11. Cancel Appointment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 700]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM pacienti_programari\nWHERE tally_id IN ('tally_full_001', 'tally_cancel_001')\nRETURNING id, tally_id;"
+      },
+      "id": "cleanup-appointments",
+      "name": "12a. Cleanup Appointments",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 700]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM doctor_availability\nWHERE calendar_event_id = 'gcal_break_001'\nRETURNING id, cabinet_medic;"
+      },
+      "id": "cleanup-blocks",
+      "name": "12b. Cleanup Blocks",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 700]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[
+        {"node": "1. Insert Appointment", "type": "main", "index": 0},
+        {"node": "4. Conflict Check (Pass)", "type": "main", "index": 0},
+        {"node": "10. Insert 2nd Appointment", "type": "main", "index": 0}
+      ]]
+    },
+    "1. Insert Appointment": {
+      "main": [[{"node": "2. Get by Tally ID", "type": "main", "index": 0}]]
+    },
+    "2. Get by Tally ID": {
+      "main": [[{"node": "3. Find by Phone", "type": "main", "index": 0}]]
+    },
+    "3. Find by Phone": {
+      "main": [[
+        {"node": "7. Daily Schedule", "type": "main", "index": 0},
+        {"node": "9. Confirm Appointment", "type": "main", "index": 0}
+      ]]
+    },
+    "7. Daily Schedule": {
+      "main": [[{"node": "8. Pending Confirmations", "type": "main", "index": 0}]]
+    },
+    "4. Conflict Check (Pass)": {
+      "main": [[{"node": "5. Insert Doctor Block", "type": "main", "index": 0}]]
+    },
+    "5. Insert Doctor Block": {
+      "main": [[{"node": "6. Conflict Check (Fail)", "type": "main", "index": 0}]]
+    },
+    "10. Insert 2nd Appointment": {
+      "main": [[{"node": "11. Cancel Appointment", "type": "main", "index": 0}]]
+    },
+    "11. Cancel Appointment": {
+      "main": [[{"node": "12a. Cleanup Appointments", "type": "main", "index": 0}]]
+    },
+    "12a. Cleanup Appointments": {
+      "main": [[{"node": "12b. Cleanup Blocks", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {}
+}
