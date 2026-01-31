@@ -17,7 +17,21 @@ class HomepageManager {
 
     init() {
         this.setupNavListeners();
+        this.setupLogoutButton();
         console.log('Homepage Manager initialized');
+    }
+
+    setupLogoutButton() {
+        // Intercept logout link to clear session properly
+        const logoutBtn = document.querySelector('.logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (confirm('Sigur doriți să vă deconectați?')) {
+                    window.authManager.logout();
+                }
+            });
+        }
     }
 
     setupNavListeners() {

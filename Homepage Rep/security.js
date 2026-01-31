@@ -1,6 +1,11 @@
 async function encryptRSA(plaintext) {
-    // YOUR PUBLIC KEY (Safe to be visible in Inspect Element)
-    const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+    // Get RSA public key from config (loaded from .env)
+    const config = window.TransfitConfig || {};
+    let PUBLIC_KEY = config.RSA_PUBLIC_KEY;
+    
+    // Fallback to hardcoded key if config not loaded
+    if (!PUBLIC_KEY || PUBLIC_KEY.includes('"-----BEGIN')) {
+        PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuZaQGlROpQBAgx857/5I
 zScw+GYx/5KX5fOFaP/lLYvzP9rrIJ3hKukCx1TkDcun1lxySXyBGXSubwFEAJer
 iz6pANRSDxmeqyZwSfdQv/o/z0SZ8uaosiVh12I24kzRxDQxslZfTRINqXO0V2Zd
@@ -9,6 +14,7 @@ iz6pANRSDxmeqyZwSfdQv/o/z0SZ8uaosiVh12I24kzRxDQxslZfTRINqXO0V2Zd
 GHAEmlzZTPm1Xe0C4K0Oc9pw4BI7AeVvSa0wjKAdspsf3SRRj2BnSRk+rg+QvizV
 TQIDAQAB
 -----END PUBLIC KEY-----`;
+    }
     
     // 1. Clean the PEM string and convert to ArrayBuffer
     const pemContents = PUBLIC_KEY

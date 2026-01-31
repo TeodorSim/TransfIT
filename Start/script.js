@@ -20,13 +20,38 @@ class LoginForm1 {
         this.init();
     }
 
-    init() {
+    async init() {
+        // Check if already logged in
+        if (window.authManager && await authManager.isAuthenticated()) {
+            window.location.href = '../Homepage Rep/Homepage.html';
+            return;
+        }
+
         this.addEventListeners();
         FormUtils.setupFloatingLabels(this.form);
         this.addInputAnimations();
         FormUtils.setupPasswordToggle(this.passwordInput, this.passwordToggle);
         this.setupSocialButtons();
+        this.initializeGoogleSignIn();
         FormUtils.addSharedAnimations();
+    }
+
+    async initializeGoogleSignIn() {
+        try {
+            if (!window.google) {
+                setTimeout(() => this.initializeGoogleSignIn(), 500);
+                return;
+            }
+
+            await window.authManager.initGoogleAuth();
+            window.authManager.renderGoogleButton('google-signin-button');
+            
+            console.log('Google Sign-In initialized');
+        } catch (error) {
+            console.error('Google init failed:', error);
+            const fallbackBtn = document.getElementById('google-btn-fallback');
+            if (fallbackBtn) fallbackBtn.style.display = 'flex';
+        }
     }
 
     addEventListeners() {
@@ -74,10 +99,10 @@ class LoginForm1 {
     }
 
     setupSocialButtons() {
-        const socialButtons = document.querySelectorAll('.social-btn');
-        socialButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => this.handleSocialLogin(e));
-        });
+        const fallbackBtn = document.getElementById('google-btn-fallback');
+        if (fallbackBtn) {
+            fallbackBtn.addEventListener('click', (e) => this.handleSocialLogin(e));
+        }
     }
 
     handleFocus(e) {
@@ -125,21 +150,7 @@ class LoginForm1 {
     }
 
     handleSocialLogin(e) {
-        const provider = e.target.closest('.social-btn').classList.contains('google-btn') ? 'Google' : 'GitHub';
-        
-        // Arată notificare de încărcare
-        FormUtils.showNotification(`Conectare cu ${provider}...`, 'info', this.form);
-        
-        // Simulează întârzierea fluxului OAuth
-        setTimeout(() => {
-            // Simulează autentificare reușită prin rețele sociale
-            FormUtils.showNotification(`Conectare reușită cu ${provider}!`, 'success', this.form);
-            
-            // Redirecționează către pagina principală după o scurtă întârziere
-            setTimeout(() => {
-                window.location.href = '../Homepage Rep/Homepage.html';
-            }, 1000);
-        }, 2000);
+        FormUtils.showNotification('Google OAuth is configured! Use the Google button above.', 'info', this.form);
     }
 
     async handleSubmit(e) {
@@ -200,15 +211,15 @@ class LoginForm1 {
         try {
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value.trim();
+            const rememberMe = document.getElementById('remember').checked;
 
-            console.log('Attempting login with:', email, password);
+            // Use authManager for login (saves session with encryption)
+            await window.authManager.login(email, password);
+            
+            if (rememberMe) {
+                await window.authManager.extendSession(true);
+            }
 
-            // Folosește funcția simulată de autentificare
-            await FormUtils.simulateLogin(email, password);
-
-            console.log('Login successful, redirecting...');
-
-            // Arată mesaj de succes și redirecționează
             this.showSuccessMessage();
 
         } catch (error) {
@@ -221,7 +232,6 @@ class LoginForm1 {
     }
 
     showSuccessMessage() {
-        // Redirectionează către pagina principală după autentificare
         window.location.href = '../Homepage Rep/Homepage.html';
     }
 

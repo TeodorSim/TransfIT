@@ -8,6 +8,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <script src="../config.js"></script>
+    <script src="../Start/auth.js"></script>
+    <script>
+        // Protect this page - redirect if not authenticated
+        (async () => {
+            if (!(await window.authManager.protectPage())) {
+                // Will redirect to login if not authenticated
+            }
+        })();
+    </script>
+    
     <!-- Navigare în bara laterală -->
     <aside class="sidebar">
         <div class="sidebar-header">

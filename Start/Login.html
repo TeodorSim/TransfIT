@@ -6,6 +6,7 @@
     <title>TransfIT - Autentificare</title>
     <link rel="icon" type="image/png" href="logo transfit.png">
     <link rel="stylesheet" href="style.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
     <div class="login-container">
@@ -64,7 +65,8 @@
             </div>
 
             <div class="social-login">
-                <button type="button" class="social-btn google-btn">
+                <div id="google-signin-button"></div>
+                <button type="button" class="social-btn google-btn" id="google-btn-fallback" style="display: none;">
                     <span class="social-icon google-icon"></span>
                     Conectare cu Google
                 </button>
@@ -75,6 +77,8 @@
         </div>
     </div>
 
+    <script src="../config.js"></script>
+    <script src="auth.js"></script>
     <script src="form-utils.js"></script>
     <script src="script.js"></script>
 </body>
