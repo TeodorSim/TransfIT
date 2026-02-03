@@ -20,6 +20,13 @@ class LoginForm1 {
         this.init();
     }
 
+    /**
+     * Inițializează toate componentele formularului de login
+     * - Configurează event listeners pentru validare și interacțiune
+     * - Adaugă animații și stiluri pentru label-uri flotante
+     * - Configurează butonul de toggle pentru parolă
+     * - Inițializează autentificarea Google
+     */
     init() {
         this.addEventListeners();
         FormUtils.setupFloatingLabels(this.form);
@@ -30,6 +37,14 @@ class LoginForm1 {
         FormUtils.addSharedAnimations();
     }
 
+    /**
+     * Configurează toți event listeners pentru formularul de login
+     * - Submit pentru validare și trimitere
+     * - Focus/Blur pentru efecte vizuale
+     * - Checkbox pentru animație "Ține-mă minte"
+     * - Link-uri pentru funcționalități viitoare
+     * - Scurtături de tastatură (Ctrl+Enter)
+     */
     addEventListeners() {
         // Trimiterea formularului
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
@@ -106,6 +121,11 @@ class LoginForm1 {
         }
     }
 
+    /**
+     * Așteaptă încărcarea API-ului Google cu timeout
+     * @param {number} timeoutMs - Timp maxim de așteptare în milisecunde (default: 5000)
+     * @returns {Promise} - Rezolvă când API-ul este disponibil, respinge la timeout
+     */
     waitForGoogleApi(timeoutMs = 5000) {
         return new Promise((resolve, reject) => {
             const start = Date.now();
@@ -172,6 +192,13 @@ class LoginForm1 {
         });
     }
 
+    /**
+     * Gestionează autentificarea prin rețele sociale (fallback manual)
+     * - Detectează providerul (Google/GitHub)
+     * - Simulează procesul de autentificare OAuth
+     * - Setează cookie de sesiune și redirecționează utilizatorul
+     * @param {Event} e - Evenimentul click pe butonul social
+     */
     handleSocialLogin(e) {
         const provider = e.target.closest('.social-btn').classList.contains('google-btn') ? 'Google' : 'GitHub';
         
@@ -197,6 +224,13 @@ class LoginForm1 {
         }, 2000);
     }
 
+    /**
+     * Gestionează evenimentul de submit al formularului
+     * - Previne trimiterea multiplă simultană
+     * - Validează toate câmpurile
+     * - Trimite datele către backend sau afișează erori
+     * @param {Event} e - Evenimentul submit
+     */
     async handleSubmit(e) {
         e.preventDefault();
 
@@ -248,6 +282,13 @@ class LoginForm1 {
         }, 500);
     }
 
+    /**
+     * Trimite datele de autentificare și procesează răspunsul
+     * - Activează starea de loading pe butonul de submit
+     * - Comunică cu backend-ul prin authManager
+     * - Setează sesiunea și redirecționează la succes
+     * - Afișează mesaje de eroare în caz de eșec
+     */
     async submitForm() {
         this.isSubmitting = true;
         this.submitBtn.classList.add('loading');
@@ -298,7 +339,14 @@ class LoginForm1 {
         }, 100);
     }
     
-    // Setează autentificare în localStorage
+    /**
+     * Salvează datele de autentificare în localStorage
+     * - Creează un obiect cu informații despre sesiune
+     * - Setează timpul de expirare bazat pe opțiunea "Ține-mă minte"
+     * - Persistă datele pentru verificarea cross-directory
+     * @param {string} username - Numele utilizatorului sau email
+     * @param {string} authType - Tipul de autentificare (basic/google/github)
+     */
     setAuthCookie(username, authType) {
         const rememberMe = document.getElementById('remember')?.checked;
         const expiryDays = rememberMe ? 30 : 1;

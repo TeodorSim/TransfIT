@@ -35,6 +35,13 @@ Base = declarative_base()
 def get_db():
     """
     Generator de sesiune DB pentru dependency injection în FastAPI
+    
+    Creează o sesiune de bază de date, o furnizează endpoint-ului,
+    și o închide automat după finalizarea request-ului.
+    Folosit cu Depends(get_db) în parametrii funcțiilor FastAPI.
+    
+    Yields:
+        Session: Sesiune SQLAlchemy pentru interacțiune cu baza de date
     """
     db = SessionLocal()
     try:

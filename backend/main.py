@@ -39,6 +39,17 @@ app.add_middleware(
 )
 
 def get_bearer_token(authorization: str = Header(None)) -> str:
+    """Extrage și validează token-ul Bearer din header-ul Authorization
+    
+    Args:
+        authorization: Header-ul Authorization din request
+        
+    Returns:
+        Token-ul extras din header
+        
+    Raises:
+        HTTPException: Dacă header-ul lipsește sau are format invalid
+    """
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
     return authorization.split(" ", 1)[1]
@@ -51,7 +62,20 @@ def read_root():
 @app.get("/api/appointments/search/{patient_name}", response_model=PatientSearchResponse)
 def search_patient_appointments(patient_name: str, db: Session = Depends(get_db)):
     """
-    Caută ultima programare a unui pacient
+    Caută și returnează ultima programare a unui pacient
+    
+    Efectuează o căutare case-insensitive în baza de date după numele pacientului.
+    Returnează ultima programare (cea mai recentă) și numărul total de programări.
+    
+    Args:
+        patient_name: Numele pacientului de căutat (acceptă căutare parțială)
+        db: Sesiunea de bază de date (injectată automat)
+        
+    Returns:
+        PatientSearchResponse cu ultima programare și statistici
+        
+    Raises:
+        HTTPException 404: Dacă nu se găsesc programări pentru acest pacient
     """
     # Căutare insensibilă la majuscule
     appointments = db.query(Appointment).filter(
@@ -86,7 +110,18 @@ def get_all_appointments(
     db: Session = Depends(get_db)
 ):
     """
-    Obține toate programările (cu paginare)
+    Obține toate programările din baza de date cu paginare
+    
+    Returnează o listă de programări ordonate descendent după data.
+    Suportă paginare prin parametrii skip și limit.
+    
+    Args:
+        skip: Numărul de înregistrări de sărit (pentru paginare)
+        limit: Numărul maxim de înregistrări de returnat
+        db: Sesiunea de bază de date (injectată automat)
+        
+    Returns:
+        Listă de AppointmentResponse cu programările găsite
     """
     appointments = db.query(Appointment).order_by(
         Appointment.appointment_date.desc()
@@ -96,7 +131,17 @@ def get_all_appointments(
 @app.post("/api/appointments", response_model=AppointmentResponse, status_code=201)
 def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get_db)):
     """
-    Creează o programare nouă
+    Creează o programare nouă în baza de date
+    
+    Validează și salvează o nouă programare pentru un pacient.
+    Datele sunt validate automat prin schema Pydantic.
+    
+    Args:
+        appointment: Datele programării (nume pacient, dată, oră, detalii)
+        db: Sesiunea de bază de date (injectată automat)
+        
+    Returns:
+        AppointmentResponse cu datele programării create (include ID și timestamp)
     """
     db_appointment = Appointment(
         patient_name=appointment.patient_name,
@@ -112,7 +157,19 @@ def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get
 @app.delete("/api/appointments/{appointment_id}")
 def delete_appointment(appointment_id: int, db: Session = Depends(get_db)):
     """
-    Șterge o programare
+    Șterge o programare din baza de date
+    
+    Caută programarea după ID și o șterge permanent din baza de date.
+    
+    Args:
+        appointment_id: ID-ul programării de șters
+        db: Sesiunea de bază de date (injectată automat)
+        
+    Returns:
+        Mesaj de confirmare a ștergerii
+        
+    Raises:
+        HTTPException 404: Dacă programarea nu există
     """
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
@@ -176,7 +233,21 @@ def list_google_calendar_events(
     access_token: str = Depends(get_bearer_token)
 ):
     """
-    Listează evenimentele din calendarul Google al utilizatorului logat.
+    Listește evenimentele din Google Calendar al utilizatorului autentificat
+    
+    Face proxy la Google Calendar API folosind token-ul de acces al utilizatorului.
+    Returnează evenimente ordonate cronologic.
+    
+    Args:
+        maxResults: Numărul maxim de evenimente de returnat (default: 10)
+        timeMin: Data minimă ISO 8601 pentru filtrare (default: acum)
+        access_token: Token-ul OAuth2 extras din header Authorization
+        
+    Returns:
+        JSON cu lista de evenimente din Google Calendar
+        
+    Raises:
+        HTTPException: Dacă cererea către Google API eșuează
     """
     if not timeMin:
         timeMin = datetime.utcnow().isoformat() + "Z"
@@ -209,7 +280,20 @@ def create_google_calendar_event(
     access_token: str = Depends(get_bearer_token)
 ):
     """
-    Creează un eveniment în calendarul Google al utilizatorului logat.
+    Creează un eveniment nou în Google Calendar al utilizatorului
+    
+    Face proxy la Google Calendar API pentru crearea unui eveniment.
+    Folosește fus orar Europa/București ca default.
+    
+    Args:
+        payload: Datele evenimentului (titlu, descriere, date, locație)
+        access_token: Token-ul OAuth2 extras din header Authorization
+        
+    Returns:
+        JSON cu datele evenimentului creat din Google Calendar
+        
+    Raises:
+        HTTPException: Dacă cererea către Google API eșuează
     """
     url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 

@@ -1,3 +1,12 @@
+/**
+ * Criptează un text folosind algoritmul RSA-OAEP cu cheia publică
+ * - Obține cheia publică RSA din configurație (.env)
+ * - Decodează formatul PEM și importă cheia pentru Web Crypto API
+ * - Criptează textul folosind RSA-OAEP cu SHA-256
+ * - Returnează datele criptate în format Base64
+ * @param {string} plaintext - Textul de criptat
+ * @returns {Promise<string>} - Textul criptat în Base64
+ */
 async function encryptRSA(plaintext) {
     // Get RSA public key from config (loaded from .env)
     const config = window.TransfitConfig || {};

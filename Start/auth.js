@@ -10,7 +10,14 @@ class AuthManager {
         this.calendarTokenClient = null;
     }
 
-    // Initialize Google Sign-In
+    /**
+     * Inițializează sistemul de autentificare Google Sign-In
+     * - Verifică dacă Client ID este configurat
+     * - Configurează comportamentul Google OAuth
+     * - Setează callback-ul pentru procesarea răspunsului
+     * @returns {Promise} - Rezolvă când inițializarea este completă
+     * @throws {Error} - Dacă Client ID lipsește sau Google API nu este disponibil
+     */
     async initGoogleAuth() {
         const clientId = this.config.GOOGLE_CLIENT_ID;
         
@@ -35,6 +42,12 @@ class AuthManager {
         });
     }
 
+    /**
+     * Inițializează clientul OAuth2 pentru accesul la Google Calendar
+     * - Creează un token client pentru solicitarea permisiunilor Calendar
+     * - Configurează scope-ul pentru operațiuni de calendar
+     * @throws {Error} - Dacă Client ID lipsește sau OAuth client nu este disponibil
+     */
     initGoogleCalendarClient() {
         const clientId = this.config.GOOGLE_CLIENT_ID;
 
@@ -73,6 +86,14 @@ class AuthManager {
         }
     }
 
+    /**
+     * Solicită permisiuni pentru accesul la Google Calendar
+     * - Inițializează clientul de calendar dacă este necesar
+     * - Gestionează fluxul OAuth pentru obținerea token-ului
+     * - Salvează token-ul cu data de expirare în localStorage
+     * @param {string} promptMode - Modul de prompt ('none', 'consent', 'select_account')
+     * @returns {Promise<string>} - Access token pentru Google Calendar API
+     */
     requestGoogleCalendarAccess(promptMode = 'none') {
         return new Promise((resolve, reject) => {
             try {
@@ -120,7 +141,14 @@ class AuthManager {
         );
     }
 
-    // Handle Google OAuth response
+    /**
+     * Procesează răspunsul de la Google OAuth
+     * - Extrage și decodează JWT token-ul
+     * - Creează sesiunea utilizatorului cu informații de profil
+     * - Salvează date de autentificare pentru compatibilitate legacy
+     * - Redirecționează utilizatorul către homepage
+     * @param {Object} response - Răspunsul de la Google cu credential JWT
+     */
     async handleGoogleResponse(response) {
         try {
             const credential = response?.credential;
@@ -173,7 +201,14 @@ class AuthManager {
         }
     }
 
-    // Parse JWT token
+    /**
+     * Decodează un JWT (JSON Web Token) și extrage payload-ul
+     * - Separă token-ul în părți (header, payload, signature)
+     * - Decodează payload-ul din Base64URL
+     * - Parsează JSON-ul pentru a obține datele utilizatorului
+     * @param {string} token - Token-ul JWT de la Google
+     * @returns {Object|null} - Datele decodate sau null în caz de eroare
+     */
     parseJwt(token) {
         try {
             const base64Url = token.split('.')[1];
@@ -188,7 +223,14 @@ class AuthManager {
         }
     }
 
-    // Save session with encryption
+    /**
+     * Salvează sesiunea utilizatorului în localStorage și cookies criptate
+     * - Serializează datele sesiunii în JSON
+     * - Stochează în localStorage pentru acces rapid
+     * - Criptează datele cu AES-GCM pentru cookie-uri securizate
+     * - Semnează datele cu HMAC pentru integritate
+     * @param {Object} sessionData - Datele sesiunii (user, token, expirare)
+     */
     async saveSession(sessionData) {
         try {
             const sessionJson = JSON.stringify(sessionData);
@@ -203,7 +245,14 @@ class AuthManager {
         }
     }
 
-    // Get current session
+    /**
+     * Recuperează sesiunea curentă din localStorage sau cookies
+     * - Caută mai întâi în localStorage pentru performanță
+     * - Fallback la cookies criptate dacă localStorage este gol
+     * - Verifică integritatea și decriptează datele
+     * - Validează expirarea sesiunii
+     * @returns {Object|null} - Datele sesiunii sau null dacă nu există/a expirat
+     */
     async getSession() {
         try {
             let sessionData = localStorage.getItem(this.SESSION_KEY);
@@ -234,7 +283,14 @@ class AuthManager {
         }
     }
 
-    // HMAC signing
+    /**
+     * Semnează datele folosind HMAC-SHA256 pentru integritate
+     * - Previne modificarea neautorizată a datelor
+     * - Folosește un secret configurat sau default
+     * - Returnează datele cu semnătura atașată
+     * @param {string} data - Datele de semnat
+     * @returns {string} - Datele + semnătura în format "data.signature"
+     */
     async signData(data) {
         const secret = this.config.COOKIE_SECRET || 'default-secret';
         const encoder = new TextEncoder();
@@ -255,7 +311,14 @@ class AuthManager {
         return `${data}.${signatureHex}`;
     }
 
-    // Verify signed data
+    /**
+     * Verifică integritatea datelor semnate cu HMAC
+     * - Separă datele de semnătură
+     * - Recalculează semnătura și o compară cu cea primită
+     * - Returnează datele doar dacă semnătura este validă
+     * @param {string} signedData - Datele semnate în format "data.signature"
+     * @returns {string|null} - Datele originale sau null dacă semnătura este invalidă
+     */
     async verifySignedData(signedData) {
         const parts = signedData.split('.');
         if (parts.length !== 2) return null;
@@ -283,7 +346,14 @@ class AuthManager {
         );
     }
 
-    // AES-GCM encryption
+    /**
+     * Criptează datele folosind AES-GCM pentru confidențialitate
+     * - Generează un IV (Initialization Vector) aleatoriu
+     * - Criptează datele cu o cheie derivată din secret
+     * - Combină IV-ul cu datele criptate pentru decriptare ulterioară
+     * @param {string} data - Datele de criptat
+     * @returns {string} - Datele criptate în format Base64
+     */
     async encryptData(data) {
         try {
             const key = this.config.ENCRYPTION_KEY || 'default-key';
@@ -308,7 +378,14 @@ class AuthManager {
         }
     }
 
-    // AES-GCM decryption
+    /**
+     * Decriptează datele criptate cu AES-GCM
+     * - Extrage IV-ul din datele criptate
+     * - Decriptează folosind cheia derivată din secret
+     * - Returnează datele originale în format text
+     * @param {string} encryptedData - Datele criptate în format Base64
+     * @returns {string} - Datele decriptate sau datele originale în caz de eroare
+     */
     async decryptData(encryptedData) {
         try {
             const key = this.config.ENCRYPTION_KEY || 'default-key';
@@ -355,6 +432,13 @@ class AuthManager {
         window.location.href = '../Start/Login.html';
     }
 
+    /**
+     * Protejează o pagină verificând autentificarea utilizatorului
+     * - Verifică existența și validitatea sesiunii
+     * - Redirecționează către login dacă utilizatorul nu este autentificat
+     * - Folosit pe paginile care necesită autentificare (Homepage, etc.)
+     * @returns {boolean} - true dacă utilizatorul este autentificat, false altfel
+     */
     async protectPage() {
         const isAuth = await this.isAuthenticated();
         if (!isAuth) {
@@ -385,6 +469,16 @@ class AuthManager {
         document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
     }
 
+    /**
+     * Autentifică utilizatorul cu email și parolă
+     * - Trimite cerere de autentificare către backend (sau simulare)
+     * - Creează sesiune la autentificare reușită
+     * - Salvează datele în localStorage și cookies
+     * @param {string} email - Email-ul sau username-ul utilizatorului
+     * @param {string} password - Parola utilizatorului
+     * @returns {Object} - {success: true} la succes
+     * @throws {Error} - Dacă autentificarea eșuează
+     */
     async login(email, password) {
         try {
             const response = await FormUtils.simulateLogin(email, password);

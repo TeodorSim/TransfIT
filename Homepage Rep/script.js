@@ -3,6 +3,11 @@ console.log('Homepage script version: 2026-02-03-1');
 // Acest fișier conține gestionarea interacțiunilor cu card-urile de pe pagina principală
 
 class HomepageManager {
+    /**
+     * Constructorul clasei HomepageManager
+     * - Inițializează referințele către elementele de navigare
+     * - Configurează date mock pentru testare (va fi înlocuit cu API real)
+     */
     constructor() {
         this.navItems = document.querySelectorAll('.nav-item');
         // Bază de date mock pentru programări (ulterior va fi înlocuită cu API real)
@@ -16,6 +21,12 @@ class HomepageManager {
         this.init();
     }
 
+    /**
+     * Inițializează toate componentele homepage-ului
+     * - Configurează event listeners pentru navigare
+     * - Setează funcționalitatea de logout
+     * - Afișează informațiile utilizatorului autentificat
+     */
     init() {
         this.setupNavListeners();
         this.setupLogoutButton();
@@ -44,6 +55,10 @@ class HomepageManager {
         this.handleAction(action);
     }
 
+    /**
+     * Distribuie acțiunile din sidebar către handler-ele corespunzătoare
+     * @param {string} action - Numele acțiunii (dashboard, programare, stergere)
+     */
     handleAction(action) {
         // Switch pentru diferite acțiuni
         switch(action) {
@@ -74,6 +89,12 @@ class HomepageManager {
         `;
     }
 
+    /**
+     * Afișează interfața pentru crearea de programări
+     * - Încarcă formularul Tally.so pentru introducerea datelor
+     * - Afișează calendarul Google cu programările existente
+     * - Permite căutarea ultimei programări a unui pacient
+     */
     handleProgramare() {
         console.log('Afișare formular creare programare');
         const mainContent = document.querySelector('.main-content');
@@ -150,6 +171,12 @@ class HomepageManager {
         this.initInlineCalendar('calendar-status-create', 'calendar-events-create');
     }
 
+    /**
+     * Afișează interfața pentru ștergerea programărilor
+     * - Permite căutarea programărilor unui pacient
+     * - Afișează lista de programări găsite
+     * - Permite ștergerea selectivă a programărilor
+     */
     handleStergere() {
         console.log('Afișare formular ștergere programare');
         const mainContent = document.querySelector('.main-content');
@@ -222,6 +249,14 @@ class HomepageManager {
         this.initInlineCalendar('calendar-status-delete', 'calendar-events-delete');
     }
 
+    /**
+     * Inițializează și afișează calendarul Google inline în interfață
+     * - Obține token de acces pentru Google Calendar API
+     * - Încarcă evenimentele din calendar
+     * - Afișează status-ul conexiunii
+     * @param {string} statusId - ID-ul elementului de status
+     * @param {string} eventsId - ID-ul containerului pentru evenimente
+     */
     async initInlineCalendar(statusId, eventsId) {
         const statusEl = document.getElementById(statusId);
         const eventsContainer = document.getElementById(eventsId);
@@ -249,6 +284,14 @@ class HomepageManager {
         }
     }
 
+    /**
+     * Asigură disponibilitatea unui token valid pentru Google Calendar
+     * - Verifică token-ul existent din localStorage
+     * - Solicită un token nou dacă este expirat sau lipsește
+     * - Poate forța re-autentificarea utilizatorului
+     * @param {boolean} forcePrompt - Forțează afișarea dialogului de autentificare
+     * @returns {Promise<string|null>} - Token-ul de acces sau null
+     */
     async ensureGoogleCalendarToken(forcePrompt = false) {
         if (!window.authManager) {
             this.showNotification('AuthManager nu este disponibil', 'error');
@@ -298,6 +341,15 @@ class HomepageManager {
         });
     }
 
+    /**
+     * Încarcă și afișează evenimentele din Google Calendar
+     * - Face request către Google Calendar API
+     * - Gestionează expirarea token-ului cu retry automat
+     * - Folosește FullCalendar.js pentru vizualizare grafică
+     * @param {HTMLElement} eventsContainer - Container pentru afișarea evenimentelor
+     * @param {HTMLElement} statusEl - Element pentru afișarea statusului
+     * @param {boolean} retried - Flag pentru a preveni retry-uri infinite
+     */
     async loadGoogleCalendarEvents(eventsContainer, statusEl, retried = false) {
         eventsContainer.innerHTML = `
             <div style="text-align: center; padding: 2rem;">
@@ -418,7 +470,13 @@ class HomepageManager {
         `;
     }
 
-    // Căutare programări pentru ștergere
+    /**
+     * Caută programările unui pacient în backend pentru ștergere
+     * - Face request către API-ul local (/api/appointments/search)
+     * - Afișează rezultatele găsite în interfață
+     * - Gestionează cazurile de eroare și lipsa rezultatelor
+     * @param {string} patientName - Numele pacientului de căutat
+     */
     async searchAppointmentsForDelete(patientName) {
         const listContainer = document.getElementById('appointments-list');
         const infoBanner = document.getElementById('delete-info-banner');
@@ -546,7 +604,14 @@ class HomepageManager {
         }
     }
 
-    // Șterge programarea selectată
+    /**
+     * Șterge o programare din baza de date
+     * - Solicită confirmare utilizatorului
+     * - Trimite request DELETE către backend
+     * - Actualizează interfața după ștergere
+     * @param {number} appointmentId - ID-ul programării de șters
+     * @param {string} patientName - Numele pacientului (pentru confirmare)
+     */
     async deleteAppointment(appointmentId, patientName) {
         if (!confirm(`Sigur doriți să ștergeți această programare pentru ${patientName}?`)) {
             return;
@@ -587,7 +652,15 @@ class HomepageManager {
         }
     }
 
-    // Căutare programare pacient (n8n automation)
+    /**
+     * Caută ultima programare a unui pacient prin webhook n8n
+     * - Împarte numele în prenume și nume
+     * - Trimite request GET către n8n automation
+     * - Gestionează răspunsuri JSON și erori CORS
+     * - Afișează datele găsite în banner
+     * @param {string} patientName - Numele complet al pacientului
+     * @param {HTMLElement} bannerEl - Element pentru afișarea rezultatelor
+     */
     async searchPatientAppointment(patientName, bannerEl) {
         // URL webhook n8n
         const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/verificare-pacient';
@@ -886,7 +959,13 @@ const addAnimationStyles = () => {
     }
 };
 
-// Funcție globală pentru verificarea autentificării
+/**
+ * Verifică autentificarea utilizatorului pe homepage
+ * - Controlează datele din localStorage și sesiunea Google
+ * * - Validează expirarea sesiunii
+ * - Redirecționează către login dacă nu este autentificat
+ * @returns {boolean} - true dacă utilizatorul este autentificat, false altfel
+ */
 function checkPageAuthentication() {
     console.log('=== Verificare autentificare Homepage ===');
     
