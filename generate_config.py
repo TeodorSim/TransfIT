@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 """Generate config.js from .env file"""
 
+from pathlib import Path
+
 def parse_env():
     config = {}
-    with open('.env', 'r') as f:
+    env_path = Path('.env')
+    if not env_path.exists():
+        env_path = Path('backend') / '.env'
+    if not env_path.exists():
+        raise FileNotFoundError("No .env found at root or backend/.env")
+    with env_path.open('r') as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith('#'):

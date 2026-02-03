@@ -438,9 +438,14 @@ body {
 }
 
 .social-btn.google-btn {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 12px;
     background: linear-gradient(135deg, #06b6d4, #6366f1);
     color: white;
-    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
     box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
 }
 

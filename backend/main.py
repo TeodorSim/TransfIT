@@ -3,15 +3,16 @@ TransfIT Backend - FastAPI + PostgreSQL
 API pentru gestionarea programărilor pacienților
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+import httpx
 
 from database import get_db, engine
 from models import Base, Appointment
-from schemas import AppointmentCreate, AppointmentResponse, PatientSearchResponse
+from schemas import AppointmentCreate, AppointmentResponse, PatientSearchResponse, CalendarEventCreate
 
 # Creare tabele în baza de date
 Base.metadata.create_all(bind=engine)
@@ -25,11 +26,22 @@ app = FastAPI(
 # Configurare CORS pentru frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:5500", "null"],  # Adaugă origin-ul frontend-ului
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:5500",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "null"
+    ],  # Adaugă origin-ul frontend-ului
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def get_bearer_token(authorization: str = Header(None)) -> str:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    return authorization.split(" ", 1)[1]
 
 @app.get("/")
 def read_root():
@@ -156,6 +168,78 @@ def seed_database(db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": f"Au fost adăugate {len(sample_appointments)} programări de test"}
+
+@app.get("/api/google/calendar/events")
+def list_google_calendar_events(
+    maxResults: int = 10,
+    timeMin: Optional[str] = None,
+    access_token: str = Depends(get_bearer_token)
+):
+    """
+    Listează evenimentele din calendarul Google al utilizatorului logat.
+    """
+    if not timeMin:
+        timeMin = datetime.utcnow().isoformat() + "Z"
+
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    params = {
+        "maxResults": maxResults,
+        "timeMin": timeMin,
+        "singleEvents": "true",
+        "orderBy": "startTime"
+    }
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(
+                url,
+                headers={"Authorization": f"Bearer {access_token}"},
+                params=params
+            )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+@app.post("/api/google/calendar/events")
+def create_google_calendar_event(
+    payload: CalendarEventCreate,
+    access_token: str = Depends(get_bearer_token)
+):
+    """
+    Creează un eveniment în calendarul Google al utilizatorului logat.
+    """
+    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+
+    event_body = {
+        "summary": payload.summary,
+        "description": payload.description,
+        "location": payload.location,
+        "start": {
+            "dateTime": payload.start.isoformat(),
+            "timeZone": payload.timeZone or "Europe/Bucharest"
+        },
+        "end": {
+            "dateTime": payload.end.isoformat(),
+            "timeZone": payload.timeZone or "Europe/Bucharest"
+        }
+    }
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post(
+                url,
+                headers={"Authorization": f"Bearer {access_token}"},
+                json=event_body
+            )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 if __name__ == "__main__":
     import uvicorn

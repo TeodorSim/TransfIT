@@ -5,11 +5,17 @@
 2. Create a new project or select existing one
 3. Navigate to **APIs & Services** → **Credentials**
 
+## 1.1 Enable Google Calendar API
+1. Go to **APIs & Services** → **Library**
+2. Search **Google Calendar API**
+3. Click **Enable**
+
 ## 2. Configure OAuth Consent Screen
 1. Click **OAuth consent screen**
 2. Select **External** user type
 3. Fill in app name and support email
 4. Save and continue through remaining steps
+5. Add scopes: `https://www.googleapis.com/auth/calendar`
 
 ## 3. Create OAuth Client ID
 1. Go to **Credentials** → **Create Credentials** → **OAuth client ID**

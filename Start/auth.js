@@ -5,7 +5,9 @@ class AuthManager {
     constructor() {
         this.SESSION_KEY = 'transfit_session';
         this.SESSION_EXPIRY = 7 * 24 * 60 * 60 * 1000;
+        this.CALENDAR_TOKEN_KEY = 'transfit_google_calendar_token';
         this.config = window.TransfitConfig || {};
+        this.calendarTokenClient = null;
     }
 
     // Initialize Google Sign-In
@@ -33,6 +35,72 @@ class AuthManager {
         });
     }
 
+    initGoogleCalendarClient() {
+        const clientId = this.config.GOOGLE_CLIENT_ID;
+
+        if (!clientId) {
+            throw new Error('Google Client ID not configured in .env');
+        }
+
+        if (!window.google?.accounts?.oauth2) {
+            throw new Error('Google OAuth client not loaded');
+        }
+
+        if (!this.calendarTokenClient) {
+            this.calendarTokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: 'https://www.googleapis.com/auth/calendar',
+                callback: () => {}
+            });
+        }
+    }
+
+    getGoogleCalendarToken() {
+        const tokenStr = localStorage.getItem(this.CALENDAR_TOKEN_KEY);
+        if (!tokenStr) return null;
+
+        try {
+            const tokenData = JSON.parse(tokenStr);
+            if (tokenData.expires_at && Date.now() > tokenData.expires_at) {
+                localStorage.removeItem(this.CALENDAR_TOKEN_KEY);
+                return null;
+            }
+            return tokenData.access_token;
+        } catch (error) {
+            console.error('Error parsing calendar token:', error);
+            localStorage.removeItem(this.CALENDAR_TOKEN_KEY);
+            return null;
+        }
+    }
+
+    requestGoogleCalendarAccess(promptMode = 'none') {
+        return new Promise((resolve, reject) => {
+            try {
+                this.initGoogleCalendarClient();
+
+                this.calendarTokenClient.callback = (response) => {
+                    if (response?.error) {
+                        reject(new Error(response.error));
+                        return;
+                    }
+
+                    const tokenData = {
+                        access_token: response.access_token,
+                        expires_in: response.expires_in,
+                        expires_at: Date.now() + (response.expires_in * 1000)
+                    };
+
+                    localStorage.setItem(this.CALENDAR_TOKEN_KEY, JSON.stringify(tokenData));
+                    resolve(tokenData.access_token);
+                };
+
+                this.calendarTokenClient.requestAccessToken({ prompt: promptMode });
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
     // Render Google Sign-In button
     renderGoogleButton(elementId) {
         if (!window.google) {
@@ -55,16 +123,20 @@ class AuthManager {
     // Handle Google OAuth response
     async handleGoogleResponse(response) {
         try {
-            const credential = response.credential;
-            const userInfo = this.parseJwt(credential);
+            const credential = response?.credential;
+            if (!credential) {
+                throw new Error('Missing Google credential');
+            }
+
+            const userInfo = this.parseJwt(credential) || {};
             
             const sessionData = {
                 token: credential,
                 user: {
-                    id: userInfo.sub,
-                    email: userInfo.email,
-                    name: userInfo.name,
-                    picture: userInfo.picture
+                    id: userInfo.sub || 'google-user',
+                    email: userInfo.email || 'unknown@google.com',
+                    name: userInfo.name || 'Utilizator Google',
+                    picture: userInfo.picture || ''
                 },
                 loginTime: Date.now(),
                 expiresAt: Date.now() + this.SESSION_EXPIRY,
@@ -72,6 +144,18 @@ class AuthManager {
             };
 
             await this.saveSession(sessionData);
+
+            try {
+                const legacyAuth = {
+                    username: sessionData.user.email || sessionData.user.name || 'Utilizator',
+                    authType: 'google',
+                    loginTime: sessionData.loginTime,
+                    expiresAt: sessionData.expiresAt
+                };
+                localStorage.setItem('transfit_auth', JSON.stringify(legacyAuth));
+            } catch (e) {
+                console.warn('Could not store legacy auth data:', e);
+            }
             
             if (window.FormUtils) {
                 FormUtils.showNotification('Conectare reușită cu Google!', 'success');
@@ -186,20 +270,25 @@ class AuthManager {
         return null;
     }
 
+    async getAesKeyFromSecret(secret) {
+        const encoder = new TextEncoder();
+        const secretBytes = encoder.encode(secret || 'default-key');
+        const hash = await crypto.subtle.digest('SHA-256', secretBytes);
+        return crypto.subtle.importKey(
+            'raw',
+            hash,
+            { name: 'AES-GCM' },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+
     // AES-GCM encryption
     async encryptData(data) {
         try {
             const key = this.config.ENCRYPTION_KEY || 'default-key';
             const encoder = new TextEncoder();
-            
-            const keyData = Uint8Array.from(atob(key), c => c.charCodeAt(0));
-            const cryptoKey = await crypto.subtle.importKey(
-                'raw',
-                keyData,
-                { name: 'AES-GCM' },
-                false,
-                ['encrypt']
-            );
+            const cryptoKey = await this.getAesKeyFromSecret(key);
             
             const iv = crypto.getRandomValues(new Uint8Array(12));
             const encrypted = await crypto.subtle.encrypt(
@@ -228,14 +317,7 @@ class AuthManager {
             const iv = combined.slice(0, 12);
             const encrypted = combined.slice(12);
             
-            const keyData = Uint8Array.from(atob(key), c => c.charCodeAt(0));
-            const cryptoKey = await crypto.subtle.importKey(
-                'raw',
-                keyData,
-                { name: 'AES-GCM' },
-                false,
-                ['decrypt']
-            );
+            const cryptoKey = await this.getAesKeyFromSecret(key);
             
             const decrypted = await crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv },

@@ -1,4 +1,5 @@
 // TransfIT Homepage - Funcționalități Card-uri
+console.log('Homepage script version: 2026-02-03-1');
 // Acest fișier conține gestionarea interacțiunilor cu card-urile de pe pagina principală
 
 class HomepageManager {
@@ -18,20 +19,8 @@ class HomepageManager {
     init() {
         this.setupNavListeners();
         this.setupLogoutButton();
+        this.displayUserInfo();
         console.log('Homepage Manager initialized');
-    }
-
-    setupLogoutButton() {
-        // Intercept logout link to clear session properly
-        const logoutBtn = document.querySelector('.logout-btn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                if (confirm('Sigur doriți să vă deconectați?')) {
-                    window.authManager.logout();
-                }
-            });
-        }
     }
 
     setupNavListeners() {
@@ -91,13 +80,11 @@ class HomepageManager {
         mainContent.innerHTML = `
             <div class="content-header">
                 <h1>Creare programare</h1>
-                <p>Completați formularul de mai jos pentru a crea o programare nouă.</p>
             </div>
             <div class="form-layout">
                 <div class="form-container">
-                    <div class="last-input">
-                        <input type="text" id="last-appointment-input" placeholder="Nume pacient (ex: Popescu Ion)" aria-label="Nume pacient" />
-                        <button id="save-appointment-btn" class="btn-primary" aria-label="Caută ultima programare">Caută</button>
+                    <div class="form-header">
+                        <h3>Formular programare</h3>
                     </div>
                     <iframe 
                         src="https://tally.so/r/obeJvO" 
@@ -109,16 +96,24 @@ class HomepageManager {
                     </iframe>
                 </div>
                 <div class="calendar-container">
-                    <div class="last-appointment-banner" id="last-appointment-banner" aria-live="polite">
-                        Ultima programare: niciuna încă.
+                    <div class="calendar-header">
+                        <h3>Calendar programări</h3>
+                        <div class="calendar-actions-inline">
+                            <input type="text" id="last-appointment-input" placeholder="Caută pacient..." />
+                            <button id="save-appointment-btn" class="btn-secondary" title="Caută ultima programare">🔍</button>
+                            <button id="calendar-refresh-create" class="btn-secondary" title="Reîncarcă calendar">🔄</button>
+                        </div>
                     </div>
-                    <iframe
-                        src="https://calendar.google.com/calendar/embed?src=en.romanian%23holiday%40group.v.calendar.google.com&ctz=Europe/Bucharest"
-                        class="calendar-iframe"
-                        frameborder="0"
-                        scrolling="no"
-                        title="Calendar test">
-                    </iframe>
+                    <div class="last-appointment-banner" id="last-appointment-banner" aria-live="polite" style="display:none;">
+                    </div>
+                    <div class="calendar-status" id="calendar-status-create" style="display:none;">
+                        Se conectează la Calendar...
+                    </div>
+                    <div id="calendar-events-create" class="appointments-list-container">
+                        <div style="text-align: center; padding: 2rem; color: #666;">
+                            <p>Se încarcă evenimentele...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -134,6 +129,7 @@ class HomepageManager {
                     this.showNotification('Introduceți numele pacientului', 'warning');
                     return;
                 }
+                bannerEl.style.display = 'block';
                 this.searchPatientAppointment(patientName, bannerEl);
             });
             // Permite căutarea cu Enter
@@ -143,51 +139,310 @@ class HomepageManager {
                 }
             });
         }
+
+        const refreshBtn = document.getElementById('calendar-refresh-create');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.initInlineCalendar('calendar-status-create', 'calendar-events-create');
+            });
+        }
+
+        this.initInlineCalendar('calendar-status-create', 'calendar-events-create');
     }
 
     handleStergere() {
-        console.log('Funcționalitate Ștergere programare - Va fi implementată');
-        // TODO: Redirect către pagina de ștergere programare
-        // window.location.href = 'stergere.html';
+        console.log('Afișare formular ștergere programare');
+        const mainContent = document.querySelector('.main-content');
+        mainContent.innerHTML = `
+            <div class="content-header">
+                <h1>Ștergere programare</h1>
+            </div>
+            <div class="form-layout">
+                <div class="form-container">
+                    <div class="form-header">
+                        <h3>Programări pacient</h3>
+                        <div class="calendar-actions-inline">
+                            <input type="text" id="search-delete-input" placeholder="Caută pacient..." />
+                            <button id="search-delete-btn" class="btn-secondary" title="Caută programări">🔍</button>
+                        </div>
+                    </div>
+                    <div class="appointments-list-container" id="appointments-list">
+                        <div style="text-align: center; padding: 2rem; color: #666;">
+                            <p>Introduceți numele pacientului pentru a căuta programări.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <h3>Calendar programări</h3>
+                        <button id="calendar-refresh-delete" class="btn-secondary" title="Reîncarcă calendar">🔄</button>
+                    </div>
+                    <div class="last-appointment-banner" id="delete-info-banner" aria-live="polite" style="display:none;">
+                    </div>
+                    <div class="calendar-status" id="calendar-status-delete" style="display:none;">
+                        Se conectează la Calendar...
+                    </div>
+                    <div id="calendar-events-delete" class="appointments-list-container">
+                        <div style="text-align: center; padding: 2rem; color: #666;">
+                            <p>Se încarcă evenimentele...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Configurează acțiunile
+        const searchBtn = document.getElementById('search-delete-btn');
+        const searchInput = document.getElementById('search-delete-input');
         
-        this.showNotification('Ștergere programare - Funcționalitate în dezvoltare', 'info');
+        if (searchBtn && searchInput) {
+            searchBtn.addEventListener('click', () => {
+                const searchTerm = searchInput.value.trim();
+                if (!searchTerm) {
+                    this.showNotification('Introduceți numele pacientului', 'warning');
+                    return;
+                }
+                this.searchAppointmentsForDelete(searchTerm);
+            });
+            
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchBtn.click();
+                }
+            });
+        }
+
+        const refreshBtn = document.getElementById('calendar-refresh-delete');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.initInlineCalendar('calendar-status-delete', 'calendar-events-delete');
+            });
+        }
+
+        this.initInlineCalendar('calendar-status-delete', 'calendar-events-delete');
     }
 
-    // Căutare programare pacient (API PostgreSQL)
-    async searchPatientAppointment(patientName, bannerEl) {
-        const API_URL = 'https://transfit.site/n8n/webhook-test/verificare-pacient';
+    async initInlineCalendar(statusId, eventsId) {
+        const statusEl = document.getElementById(statusId);
+        const eventsContainer = document.getElementById(eventsId);
 
-        // 1. Split 'name surname' into components
-        const nameParts = patientName.trim().split(/\s+/);
-        const rawNume = nameParts[0] || '';
-        const rawPrenume = nameParts.slice(1).join(' ') || '';
-        const ts = Date.now();
+        if (!statusEl || !eventsContainer) return;
+
+        try {
+            statusEl.style.display = 'block';
+            statusEl.textContent = 'Se conectează la Calendar...';
+            const accessToken = await this.ensureGoogleCalendarToken();
+            if (!accessToken) {
+                throw new Error('Token calendar lipsă');
+            }
+
+            statusEl.textContent = 'Calendar conectat. Se încarcă evenimentele...';
+            await this.loadGoogleCalendarEvents(eventsContainer, statusEl);
+        } catch (error) {
+            console.error('Calendar inline error:', error);
+            statusEl.textContent = 'Nu am putut conecta Calendarul.';
+            eventsContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <p>Conectarea la Calendar a eșuat.</p>
+                </div>
+            `;
+        }
+    }
+
+    async ensureGoogleCalendarToken(forcePrompt = false) {
+        if (!window.authManager) {
+            this.showNotification('AuthManager nu este disponibil', 'error');
+            return null;
+        }
+
+        const existingToken = window.authManager.getGoogleCalendarToken();
+        if (existingToken && !forcePrompt) {
+            return existingToken;
+        }
+
+        return window.authManager.requestGoogleCalendarAccess('consent');
+    }
+
+    ensureFullCalendarLoaded(timeoutMs = 8000) {
+        return new Promise((resolve, reject) => {
+            if (window.FullCalendar) {
+                resolve(true);
+                return;
+            }
+
+            const existingScript = document.querySelector('script[data-fullcalendar="true"]');
+            if (existingScript) {
+                const start = Date.now();
+                const check = () => {
+                    if (window.FullCalendar) {
+                        resolve(true);
+                        return;
+                    }
+                    if (Date.now() - start > timeoutMs) {
+                        reject(new Error('FullCalendar failed to load'));
+                        return;
+                    }
+                    setTimeout(check, 100);
+                };
+                check();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js';
+            script.async = true;
+            script.dataset.fullcalendar = 'true';
+            script.onload = () => resolve(true);
+            script.onerror = () => reject(new Error('FullCalendar script load error'));
+            document.head.appendChild(script);
+        });
+    }
+
+    async loadGoogleCalendarEvents(eventsContainer, statusEl, retried = false) {
+        eventsContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <strong>Se încarcă evenimentele...</strong>
+            </div>
+        `;
+
+        try {
+            const accessToken = await this.ensureGoogleCalendarToken();
+            if (!accessToken) {
+                throw new Error('Token calendar lipsă');
+            }
+
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59);
+            const timeMin = monthStart.toISOString();
+            const timeMax = monthEnd.toISOString();
+            const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+            url.searchParams.set('maxResults', '250');
+            url.searchParams.set('timeMin', timeMin);
+            url.searchParams.set('timeMax', timeMax);
+            url.searchParams.set('singleEvents', 'true');
+            url.searchParams.set('orderBy', 'startTime');
+
+            console.log('Calendar fetch URL:', url.toString());
+            const response = await fetch(url.toString(), {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
+            });
+
+            if (response.status === 401 && !retried) {
+                await this.ensureGoogleCalendarToken(true);
+                return this.loadGoogleCalendarEvents(eventsContainer, statusEl, true);
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Calendar events loaded:', data?.items?.length || 0);
+
+            try {
+                await this.ensureFullCalendarLoaded();
+            } catch (e) {
+                console.warn('FullCalendar not available:', e);
+            }
+
+            this.renderGoogleCalendarEvents(data, eventsContainer);
+
+            if (statusEl) {
+                statusEl.textContent = 'Evenimente încărcate cu succes.';
+                setTimeout(() => {
+                    if (statusEl.textContent === 'Evenimente încărcate cu succes.') {
+                        statusEl.textContent = '';
+                        statusEl.style.display = 'none';
+                    }
+                }, 2500);
+            }
+        } catch (error) {
+            console.error('Calendar fetch error:', error);
+            if (statusEl) {
+                statusEl.style.display = 'block';
+                statusEl.textContent = 'Nu am putut încărca evenimentele.';
+            }
+            eventsContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <p>Eroare la încărcarea evenimentelor.</p>
+                    <p style="font-size: 12px;">${error?.message || 'Eroare necunoscută'}</p>
+                </div>
+            `;
+        }
+    }
+
+    renderGoogleCalendarEvents(data, container) {
+        const events = data?.items || [];
+
+        console.log('FullCalendar available:', Boolean(window.FullCalendar));
+        if (window.FullCalendar) {
+            container.innerHTML = '<div class="calendar-view" style="background:#fff;border-radius:12px;padding:12px;min-height:520px;"></div>';
+            const calendarEl = container.querySelector('.calendar-view');
+
+            const calendarEvents = events.map(event => {
+                const start = event.start?.dateTime || event.start?.date || '';
+                const end = event.end?.dateTime || event.end?.date || '';
+                const isAllDay = Boolean(event.start?.date && !event.start?.dateTime);
+                return {
+                    title: event.summary || 'Fără titlu',
+                    start,
+                    end,
+                    allDay: isAllDay
+                };
+            });
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 'auto',
+                locale: 'ro',
+                events: calendarEvents,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                }
+            });
+
+            calendar.render();
+            return;
+        }
+
+        container.innerHTML = `
+            <div style="text-align:center; padding:2rem; color:#ef4444;">
+                <p>Nu pot afișa calendarul (biblioteca FullCalendar nu s-a încărcat).</p>
+                <p style="font-size:12px;">Reîncercați cu refresh (Ctrl+F5).</p>
+            </div>
+        `;
+    }
+
+    // Căutare programări pentru ștergere
+    async searchAppointmentsForDelete(patientName) {
+        const listContainer = document.getElementById('appointments-list');
+        const infoBanner = document.getElementById('delete-info-banner');
         
-        // 2. Create the data string to encrypt
-        const dataString = `nume=${rawNume}&prenume=${rawPrenume}&ts=${ts}`;
-        const encryptedData = await encryptRSA(dataString);
-
         // Afișează loading
-        bannerEl.innerHTML = `<strong>Se caută...</strong> ${patientName}`;
-        const url_decoded=API_URL+`?data=${encodeURIComponent(encryptedData)}`;
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <strong>Se caută...</strong> ${patientName}
+            </div>
+        `;
         
         try {
-            // 3. Send POST request with encrypted data
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ data: encryptedData })
-            });
+            // Caută programări în backend
+            const API_URL = 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/appointments/search/${encodeURIComponent(patientName)}`);
             
             if (!response.ok) {
                 if (response.status === 404) {
-                    bannerEl.innerHTML = `
-                        <strong>Pacient:</strong> ${patientName}<br>
-                        <span style="color: #ef4444;">Nu s-au găsit programări.</span>
+                    listContainer.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                            <p>Nu s-au găsit programări pentru: <strong>${patientName}</strong></p>
+                        </div>
                     `;
-                    this.showNotification('Nu s-au găsit programări pentru acest pacient', 'info');
+                    this.showNotification('Nu s-au găsit programări', 'info');
                     return;
                 }
                 throw new Error(`HTTP ${response.status}`);
@@ -195,59 +450,281 @@ class HomepageManager {
             
             const data = await response.json();
             
-            // Check if success and has history data
-            if (!data.success || !data.history || data.history.length === 0) {
-                bannerEl.innerHTML = `
-                    <strong>Pacient:</strong> ${patientName}<br>
-                    <span style="color: #ef4444;">Nu s-au găsit programări.</span>
-                `;
-                this.showNotification('Nu s-au găsit programări pentru acest pacient', 'info');
-                return;
-            }
-            
-            // Build HTML for all appointments
-            let appointmentsHTML = `<strong>Găsite ${data.count} programare/programări:</strong><br><br>`;
-            
-            data.history.forEach((appointment, index) => {
-                const dateFormatted = new Date(appointment.data_programare).toLocaleDateString('ro-RO', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                
-                const timeFormatted = appointment.ora_start ? appointment.ora_start.substring(0, 5) : 'N/A';
-                
-                const medicFormatted = appointment.cabinet_medic
-                    .toString()
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ');
-                
-                const details = appointment.info_relevante ? appointment.info_relevante : 'Nu au fost înregistrate alte detalii.';
-                
-                appointmentsHTML += `
-                    <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(229, 231, 235, 0.3);">
-                        <strong>Programare ${index + 1}:</strong><br>
-                        <strong>Data:</strong> ${dateFormatted} la ${timeFormatted}<br>
-                        <strong>Medic:</strong> ${medicFormatted}<br>
-                        <strong>Detalii:</strong> ${details}<br>
-                    </div>
-                `;
-            });
-            
-            bannerEl.innerHTML = appointmentsHTML;
-            this.showNotification(`Găsite ${data.count} programare/programări`, 'success');
+            // Afișează lista de programări
+            this.displayAppointmentsList(data, patientName);
             
         } catch (error) {
-            console.error('Eroare la căutarea programării:', error);
-            bannerEl.innerHTML = `
-                <strong>Eroare:</strong> Nu s-a putut conecta la server.<br>
-                <span style="color: #ef4444;">Verifică dacă backend-ul rulează pe ${API_URL}</span>
+            console.error('Eroare la căutarea programărilor:', error);
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <p><strong>Eroare:</strong> Nu s-a putut conecta la server.</p>
+                    <p style="font-size: 12px;">Verifică dacă backend-ul rulează pe http://localhost:8000</p>
+                </div>
             `;
-            this.showNotification('Eroare de conexiune la API', 'error');
+            this.showNotification('Eroare de conexiune', 'error');
         }
     }
 
+    // Afișează lista de programări găsite
+    displayAppointmentsList(data, patientName) {
+        const listContainer = document.getElementById('appointments-list');
+        
+        // Backend returnează un singur rezultat, dar îl putem trata ca array
+        const appointments = data.last_appointment ? [data.last_appointment] : [];
+        
+        if (appointments.length === 0) {
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <p>Nu s-au găsit programări.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div style="padding: 1rem;">
+                <h3 style="margin-bottom: 1rem; color: #1800ad;">Programări găsite (${appointments.length})</h3>
+                <div class="appointments-grid">
+        `;
+        
+        appointments.forEach((apt, index) => {
+            const dateFormatted = new Date(apt.date).toLocaleDateString('ro-RO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            html += `
+                <div class="appointment-card" data-appointment-id="${apt.id}" onclick="homepageManager.selectAppointment(${apt.id}, '${patientName}', '${dateFormatted}', '${apt.time}', '${apt.details?.replace(/'/g, "\\'")}')">
+                    <div class="appointment-card-header">
+                        <strong style="color: #1800ad;">📅 ${dateFormatted}</strong>
+                    </div>
+                    <div class="appointment-card-body">
+                        <p><strong>Oră:</strong> ${apt.time}</p>
+                        <p><strong>Detalii:</strong> ${apt.details || 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        listContainer.innerHTML = html;
+    }
+
+    // Selectează o programare pentru ștergere
+    selectAppointment(id, patientName, date, time, details) {
+        // Marchează card-ul ca selectat
+        document.querySelectorAll('.appointment-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        const selectedCard = document.querySelector(`[data-appointment-id="${id}"]`);
+        if (selectedCard) {
+            selectedCard.classList.add('selected');
+        }
+        
+        // Afișează detaliile în banner
+        const infoBanner = document.getElementById('delete-info-banner');
+        infoBanner.style.display = 'block';
+        infoBanner.innerHTML = `
+            <strong>Pacient:</strong> ${patientName}<br>
+            <strong>Data:</strong> ${date} la ${time}<br>
+            <strong>Detalii:</strong> ${details}<br>
+            <button id="confirm-delete-btn" class="btn-danger" style="margin-top: 1rem;">
+                🗑️ Șterge această programare
+            </button>
+        `;
+        
+        // Adaugă eveniment pentru butonul de ștergere
+        const deleteBtn = document.getElementById('confirm-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => this.deleteAppointment(id, patientName));
+        }
+    }
+
+    // Șterge programarea selectată
+    async deleteAppointment(appointmentId, patientName) {
+        if (!confirm(`Sigur doriți să ștergeți această programare pentru ${patientName}?`)) {
+            return;
+        }
+        
+        try {
+            const API_URL = 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            this.showNotification('Programare ștearsă cu succes!', 'success');
+            
+            // Reîncarcă lista de programări
+            const searchInput = document.getElementById('search-delete-input');
+            if (searchInput && searchInput.value.trim()) {
+                this.searchAppointmentsForDelete(searchInput.value.trim());
+            } else {
+                // Resetează interfața
+                document.getElementById('appointments-list').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #666;">
+                        <p>✓ Programare ștearsă cu succes!</p>
+                        <p style="margin-top: 1rem;">Introduceți un nou nume pentru a căuta alte programări.</p>
+                    </div>
+                `;
+                document.getElementById('delete-info-banner').innerHTML = `
+                    Selectați o programare pentru a vedea detaliile.
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Eroare la ștergerea programării:', error);
+            this.showNotification('Eroare la ștergerea programării', 'error');
+        }
+    }
+
+    // Căutare programare pacient (n8n automation)
+    async searchPatientAppointment(patientName, bannerEl) {
+        // URL webhook n8n
+        const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/verificare-pacient';
+        
+        // Afișează loading
+        bannerEl.innerHTML = `<strong>Se caută...</strong> ${patientName}`;
+        
+        try {
+            // Împarte numele în părți
+            const nameParts = patientName.trim().split(' ');
+            let prenume = '';
+            let nume = '';
+            
+            if (nameParts.length >= 2) {
+                // Presupunem ordinea: prenume nume (ex: Teodor Simionescu)
+                prenume = nameParts.slice(0, -1).join(' ');
+                nume = nameParts[nameParts.length - 1];
+            } else {
+                // Dacă e doar un cuvânt, îl punem ca prenume
+                prenume = nameParts[0] || '';
+            }
+            
+            // Construiește URL-ul cu parametrii
+            const url = new URL(N8N_WEBHOOK_URL);
+            if (prenume) url.searchParams.append('prenume', prenume.toLowerCase());
+            if (nume) url.searchParams.append('nume', nume.toLowerCase());
+            
+            console.log('Request URL:', url.toString());
+            
+            // Trimite request GET către n8n
+            const response = await fetch(url.toString(), {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                mode: 'cors'
+            });
+            
+            console.log('Response status:', response.status);
+            
+            // Încearcă să parsezi răspunsul JSON indiferent de status code
+            let data;
+            try {
+                data = await response.json();
+                console.log('Response data:', data);
+            } catch (parseError) {
+                console.error('Nu s-a putut parsa JSON:', parseError);
+                throw new Error('Răspuns invalid de la server');
+            }
+            
+            // Verifică dacă n8n returnează mesaj că nu a găsit pacientul
+            if (data.code === 0 && data.message === "No item to return was found") {
+                bannerEl.innerHTML = `
+                    <strong>Pacient:</strong> ${patientName}<br>
+                    <span style="color: #ef4444;">Nu s-au găsit programări în baza de date.</span><br>
+                    <span style="color: #666; font-size: 12px;">Încercați formatul: Prenume Nume (ex: Teodor Simionescu)</span>
+                `;
+                this.showNotification('Pacientul nu a fost găsit', 'info');
+                return;
+            }
+            
+            // Verifică dacă sunt date valide returnate
+            if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+                bannerEl.innerHTML = `
+                    <strong>Pacient:</strong> ${patientName}<br>
+                    <span style="color: #ef4444;">Nu s-au găsit date.</span>
+                `;
+                this.showNotification('Nu s-au găsit date pentru acest pacient', 'info');
+                return;
+            }
+            
+            // Afișează datele primite din n8n
+            this.displayAppointmentData(data, bannerEl, patientName);
+            this.showNotification('Date încărcate cu succes', 'success');
+            
+        } catch (error) {
+            console.error('Eroare completă:', error);
+            
+            let errorMessage = 'Nu s-a putut conecta la n8n automation.';
+            
+            // Identifică tipul de eroare
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                errorMessage = 'Eroare CORS sau conexiune. Verifică:<br>1. Webhook-ul n8n este activ<br>2. CORS este configurat în n8n<br>3. URL-ul este corect';
+            } else if (error.message.includes('Răspuns invalid')) {
+                errorMessage = 'Serverul n8n nu returnează JSON valid';
+            } else {
+                errorMessage = error.message;
+            }
+            
+            bannerEl.innerHTML = `
+                <strong>Eroare:</strong> ${errorMessage}<br>
+                <span style="color: #ef4444; font-size: 12px;">Verifică consola browser-ului (F12) pentru detalii</span>
+            `;
+            this.showNotification('Eroare de conexiune la n8n', 'error');
+        }
+    }
+
+    // Afișează datele primite din n8n
+    displayAppointmentData(data, bannerEl, patientName) {
+        // Versiune 1: Dacă primești un array de programări
+        if (Array.isArray(data)) {
+            const lastAppointment = data[0]; // Prima programare din listă
+            bannerEl.innerHTML = `
+                <strong>Pacient:</strong> ${lastAppointment.patient_name || lastAppointment.nume || patientName}<br>
+                <strong>Data:</strong> ${lastAppointment.date || lastAppointment.data || 'N/A'} la ${lastAppointment.time || lastAppointment.ora || 'N/A'}<br>
+                <strong>Detalii:</strong> ${lastAppointment.details || lastAppointment.detalii || 'N/A'}<br>
+                <strong>Total programări:</strong> ${data.length}
+            `;
+        } 
+        // Versiune 2: Dacă primești un obiect cu proprietăți
+        else if (typeof data === 'object') {
+            // Adaptează câmpurile în funcție de structura JSON-ului tău
+            const dateStr = data.date || data.data || data.appointment_date;
+            const dateFormatted = dateStr ? new Date(dateStr).toLocaleDateString('ro-RO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }) : 'N/A';
+            
+            bannerEl.innerHTML = `
+                <strong>Pacient:</strong> ${data.patient_name || data.nume_complet || data.prenume + ' ' + data.nume || patientName}<br>
+                <strong>Data:</strong> ${dateFormatted} la ${data.time || data.ora || data.appointment_time || 'N/A'}<br>
+                <strong>Detalii:</strong> ${data.details || data.detalii || data.description || 'N/A'}
+            `;
+            
+            // Adaugă orice alte câmpuri relevante din JSON
+            if (data.phone || data.telefon) {
+                bannerEl.innerHTML += `<br><strong>Telefon:</strong> ${data.phone || data.telefon}`;
+            }
+            if (data.email) {
+                bannerEl.innerHTML += `<br><strong>Email:</strong> ${data.email}`;
+            }
+            if (data.status || data.stare) {
+                bannerEl.innerHTML += `<br><strong>Status:</strong> ${data.status || data.stare}`;
+            }
+        }
+    }
 
     // Sistem de notificări
     showNotification(message, type = 'info') {
@@ -298,17 +775,82 @@ class HomepageManager {
 
     // Funcții helper pentru viitoare funcționalități
     
+    // Obține datele de autentificare din localStorage
+    getAuthCookie() {
+        const authDataStr = localStorage.getItem('transfit_auth');
+        if (authDataStr) {
+            try {
+                return JSON.parse(authDataStr);
+            } catch (e) {
+                console.error('Eroare la parsarea datelor de autentificare:', e);
+                return null;
+            }
+        }
+
+        const sessionStr = localStorage.getItem('transfit_session');
+        if (!sessionStr) return null;
+        
+        try {
+            const session = JSON.parse(sessionStr);
+            return {
+                username: session.user?.email || session.user?.name || 'Utilizator',
+                authType: session.provider || 'email',
+                loginTime: session.loginTime
+            };
+        } catch (e) {
+            console.error('Eroare la parsarea datelor de autentificare:', e);
+            return null;
+        }
+    }
+    
+    // Afișează informații despre utilizator
+    displayUserInfo() {
+        const authData = this.getAuthCookie();
+        if (authData) {
+            // Opțional: poți afișa numele utilizatorului în interfață
+            console.log(`Bine ai venit, ${authData.username}!`);
+        }
+    }
+    
+    // Configurează butonul de logout
+    setupLogoutButton() {
+        const logoutBtn = document.querySelector('.logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.logout();
+            });
+        }
+    }
+    
+    // Logout - șterge datele de autentificare și redirecționează
+    logout() {
+        // Șterge datele de autentificare din localStorage
+        localStorage.removeItem('transfit_auth');
+        localStorage.removeItem('transfit_session');
+        if (window.authManager && typeof window.authManager.clearSession === 'function') {
+            window.authManager.clearSession();
+        }
+        console.log('Logout efectuat, date de autentificare șterse');
+        
+        // Redirecționează către pagina de login
+        window.location.href = '../Start/Login.html';
+    }
+    
     getUserData() {
-        // TODO: Obține datele utilizatorului din localStorage sau API
+        // Obține datele utilizatorului din cookie
+        const authData = this.getAuthCookie();
+        if (authData) {
+            return {
+                name: authData.username,
+                authType: authData.authType,
+                loginTime: authData.loginTime
+            };
+        }
         return {
             name: 'Utilizator',
             email: 'user@example.com'
         };
-    }
-
-    checkAuthentication() {
-        // TODO: Verifică dacă utilizatorul este autentificat
-        return true;
     }
 }
 
@@ -344,8 +886,80 @@ const addAnimationStyles = () => {
     }
 };
 
+// Funcție globală pentru verificarea autentificării
+function checkPageAuthentication() {
+    console.log('=== Verificare autentificare Homepage ===');
+    
+    // Verifică localStorage
+    const authDataStr = localStorage.getItem('transfit_auth');
+    console.log('Auth data din localStorage:', authDataStr);
+    const sessionStr = localStorage.getItem('transfit_session');
+    if (!authDataStr && sessionStr) {
+        console.log('Auth data din transfit_session:', sessionStr);
+        try {
+            const session = JSON.parse(sessionStr);
+            const now = Date.now();
+            if (session.expiresAt && now > session.expiresAt) {
+                console.log('❌ Sesiune Google expirată, redirecționare către login...');
+                localStorage.removeItem('transfit_session');
+                setTimeout(() => {
+                    window.location.href = '../Start/Login.html';
+                }, 500);
+                return false;
+            }
+
+            console.log('✅ Utilizator autentificat (Google):', session.user?.email || session.user?.name || 'Utilizator');
+            return true;
+        } catch (e) {
+            console.error('❌ Eroare la parsarea sesiunii Google:', e);
+            localStorage.removeItem('transfit_session');
+        }
+    }
+    
+    if (!authDataStr) {
+        console.log('❌ Nu există date de autentificare, redirecționare către login...');
+        setTimeout(() => {
+            window.location.href = '../Start/Login.html';
+        }, 500);
+        return false;
+    }
+    
+    try {
+        const authData = JSON.parse(authDataStr);
+        console.log('Auth data parsată:', authData);
+        
+        // Verifică dacă sesiunea a expirat
+        const now = new Date().getTime();
+        if (authData.expiresAt && now > authData.expiresAt) {
+            console.log('❌ Sesiune expirată, redirecționare către login...');
+            localStorage.removeItem('transfit_auth');
+            setTimeout(() => {
+                window.location.href = '../Start/Login.html';
+            }, 500);
+            return false;
+        }
+        
+        console.log('✅ Utilizator autentificat:', authData.username, '(', authData.authType, ')');
+        return true;
+        
+    } catch (e) {
+        console.error('❌ Eroare la parsarea datelor de autentificare:', e);
+        localStorage.removeItem('transfit_auth');
+        setTimeout(() => {
+            window.location.href = '../Start/Login.html';
+        }, 500);
+        return false;
+    }
+}
+
 // Inițializează homepage manager la încărcarea paginii
+let homepageManager;
 document.addEventListener('DOMContentLoaded', () => {
+    // Verifică autentificarea ÎNAINTE de a inițializa pagina
+    if (!checkPageAuthentication()) {
+        return; // Oprește încărcarea dacă nu este autentificat
+    }
+    
     addAnimationStyles();
-    new HomepageManager();
+    homepageManager = new HomepageManager();
 });

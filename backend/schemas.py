@@ -3,7 +3,7 @@ Pydantic schemas pentru validare request/response
 """
 
 from pydantic import BaseModel, Field
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, Dict
 
 class AppointmentBase(BaseModel):
@@ -30,3 +30,12 @@ class PatientSearchResponse(BaseModel):
     patient_name: str
     last_appointment: Dict
     total_appointments: int
+
+class CalendarEventCreate(BaseModel):
+    """Schema pentru creare eveniment în Google Calendar"""
+    summary: str = Field(..., min_length=2, max_length=200)
+    start: datetime
+    end: datetime
+    timeZone: Optional[str] = 'Europe/Bucharest'
+    description: Optional[str] = None
+    location: Optional[str] = None
