@@ -173,6 +173,13 @@ class AuthManager {
 
             await this.saveSession(sessionData);
 
+            // Curata sesiunea backend (cookie) daca exista una veche
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            } catch (e) {
+                console.warn('Could not clear backend session:', e);
+            }
+
             try {
                 const legacyAuth = {
                     username: sessionData.user.email || sessionData.user.name || 'Utilizator',
@@ -411,12 +418,32 @@ class AuthManager {
 
     async isAuthenticated() {
         const session = await this.getSession();
-        return session !== null;
+        if (session !== null) {
+            return true;
+        }
+
+        const user = await this.fetchCurrentUser();
+        return Boolean(user);
     }
 
     async getCurrentUser() {
         const session = await this.getSession();
-        return session ? session.user : null;
+        if (session) {
+            return session.user;
+        }
+
+        return this.fetchCurrentUser();
+    }
+
+    async fetchCurrentUser() {
+        try {
+            const response = await fetch('/api/auth/me', { credentials: 'include' });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (error) {
+            console.warn('Could not fetch current user:', error);
+            return null;
+        }
     }
 
     clearSession() {
@@ -428,8 +455,12 @@ class AuthManager {
     }
 
     logout() {
-        this.clearSession();
-        window.location.href = '../Start/Login.html';
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+            .catch(() => {})
+            .finally(() => {
+                this.clearSession();
+                window.location.href = '../Start/Login.html';
+            });
     }
 
     /**
@@ -481,19 +512,28 @@ class AuthManager {
      */
     async login(email, password) {
         try {
-            const response = await FormUtils.simulateLogin(email, password);
-            
-            if (response.success) {
-                const sessionData = {
-                    user: response.user,
-                    loginTime: Date.now(),
-                    expiresAt: Date.now() + this.SESSION_EXPIRY,
-                    provider: 'email'
-                };
-                
-                await this.saveSession(sessionData);
-                return { success: true };
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ email, password })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Datele de logare sunt invalide');
             }
+
+            const data = await response.json();
+            const sessionData = {
+                user: data.user,
+                loginTime: Date.now(),
+                expiresAt: new Date(data.expires_at).getTime(),
+                provider: 'email'
+            };
+
+            await this.saveSession(sessionData);
+            return { success: true };
         } catch (error) {
             throw error;
         }

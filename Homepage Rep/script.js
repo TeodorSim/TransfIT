@@ -105,7 +105,11 @@ class HomepageManager {
             <div class="form-layout">
                 <div class="form-container">
                     <div class="form-header">
-                        <h3>Formular programare</h3>
+                        <h3>Formular</h3>
+                        <div class="calendar-actions-inline">
+                            <button id="form-programare-btn" class="btn-secondary form-toggle-btn" title="Formular programare">Programare</button>
+                            <button id="form-disponibilitate-btn" class="btn-secondary form-toggle-btn" title="Formular disponibilitate">Disponibilitate</button>
+                        </div>
                     </div>
                     <iframe 
                         src="https://tally.so/r/obeJvO" 
@@ -138,6 +142,44 @@ class HomepageManager {
                 </div>
             </div>
         `;
+
+        const formIframe = document.querySelector('.tally-iframe');
+        const programareBtn = document.getElementById('form-programare-btn');
+        const disponibilitateBtn = document.getElementById('form-disponibilitate-btn');
+        const currentLinks = {
+            programare: 'https://tally.so/r/obeJvO',
+            disponibilitate: 'https://tally.so/r/vGDVKQ'
+        };
+
+        if (formIframe && programareBtn && disponibilitateBtn) {
+            const loadForm = (baseUrl) => {
+                const cacheBuster = `ts=${Date.now()}`;
+                const separator = baseUrl.includes('?') ? '&' : '?';
+                formIframe.setAttribute('src', `${baseUrl}${separator}${cacheBuster}`);
+            };
+
+            programareBtn.addEventListener('click', () => {
+                loadForm(currentLinks.programare);
+            });
+            disponibilitateBtn.addEventListener('click', () => {
+                loadForm(currentLinks.disponibilitate);
+            });
+
+            const authData = this.getAuthCookie();
+            const email = authData?.username || '';
+            if (email) {
+                fetch(`/api/form-links?email=${encodeURIComponent(email)}`)
+                    .then(response => response.ok ? response.json() : null)
+                    .then((data) => {
+                        if (data?.programare) currentLinks.programare = data.programare;
+                        if (data?.disponibilitate) currentLinks.disponibilitate = data.disponibilitate;
+                        loadForm(currentLinks.programare);
+                    })
+                    .catch(() => {
+                        loadForm(currentLinks.programare);
+                    });
+            }
+        }
 
         // Configurează acțiunea butonului pentru căutarea pacientului
         const btn = document.getElementById('save-appointment-btn');
@@ -490,8 +532,7 @@ class HomepageManager {
         
         try {
             // Caută programări în backend
-            //const API_URL = 'http://localhost:8000';
-            const N8N_DELETE_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-cautare-programari';
+            const API_URL = 'http://localhost:8000';
             const response = await fetch(`${API_URL}/api/appointments/search/${encodeURIComponent(patientName)}`);
             
             if (!response.ok) {
@@ -664,10 +705,10 @@ class HomepageManager {
      */
     async searchPatientAppointment(patientName, bannerEl) {
         // URL webhook n8n
-        const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-verificare-pacient';
+        const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/verificare-pacient';
         
         // Afișează loading
-        bannerEl.innerHTML = `<strong>Se caută...</strong>`;
+        bannerEl.innerHTML = `<strong>Se caută...</strong> ${patientName}`;
         
         try {
             // Împarte numele în părți
@@ -689,17 +730,11 @@ class HomepageManager {
             if (prenume) url.searchParams.append('prenume', prenume.toLowerCase());
             if (nume) url.searchParams.append('nume', nume.toLowerCase());
             
-            const ts = Date.now();
-            const dataString = `nume=${nume}&prenume=${prenume}&ts=${ts}`;
-            const encryptedData = await encryptRSA(dataString);
-            
-            const url_decoded=N8N_WEBHOOK_URL+`?data=${encodeURIComponent(encryptedData)}`;
-
-            console.log('Request URL:', url_decoded.toString());
+            console.log('Request URL:', url.toString());
             
             // Trimite request GET către n8n
-            const response = await fetch(url_decoded.toString(), {
-                method: 'POST',
+            const response = await fetch(url.toString(), {
+                method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                 },
@@ -719,7 +754,7 @@ class HomepageManager {
             }
             
             // Verifică dacă n8n returnează mesaj că nu a găsit pacientul
-            if (data.message === "No item to return was found") {
+            if (data.code === 0 && data.message === "No item to return was found") {
                 bannerEl.innerHTML = `
                     <strong>Pacient:</strong> ${patientName}<br>
                     <span style="color: #ef4444;">Nu s-au găsit programări în baza de date.</span><br>
@@ -730,7 +765,7 @@ class HomepageManager {
             }
             
             // Verifică dacă sunt date valide returnate
-            if (!data || (data.count === 0)) {
+            if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
                 bannerEl.innerHTML = `
                     <strong>Pacient:</strong> ${patientName}<br>
                     <span style="color: #ef4444;">Nu s-au găsit date.</span>
@@ -768,33 +803,14 @@ class HomepageManager {
     // Afișează datele primite din n8n
     displayAppointmentData(data, bannerEl, patientName) {
         // Versiune 1: Dacă primești un array de programări
-        if (Array.isArray(data.history)) {
-            data.history.forEach((appointment, index) => {
-                const dateFormatted = new Date(appointment.data_programare).toLocaleDateString('ro-RO', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                
-                const timeFormatted = appointment.ora_start ? appointment.ora_start.substring(0, 5) : 'N/A';
-                
-                const medicFormatted = appointment.cabinet_medic
-                    .toString()
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ');
-                
-                const details = appointment.info_relevante ? appointment.info_relevante : 'Nu au fost înregistrate alte detalii.';
-                
-                bannerEl.innerHTML += `
-                    <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(229, 231, 235, 0.3);">
-                        <strong>Programare ${index + 1}:</strong><br>
-                        <strong>Data:</strong> ${dateFormatted} la ${timeFormatted}<br>
-                        <strong>Medic:</strong> ${medicFormatted}<br>
-                        <strong>Detalii:</strong> ${details}<br>
-                    </div>
-                `;
-            });
+        if (Array.isArray(data)) {
+            const lastAppointment = data[0]; // Prima programare din listă
+            bannerEl.innerHTML = `
+                <strong>Pacient:</strong> ${lastAppointment.patient_name || lastAppointment.nume || patientName}<br>
+                <strong>Data:</strong> ${lastAppointment.date || lastAppointment.data || 'N/A'} la ${lastAppointment.time || lastAppointment.ora || 'N/A'}<br>
+                <strong>Detalii:</strong> ${lastAppointment.details || lastAppointment.detalii || 'N/A'}<br>
+                <strong>Total programări:</strong> ${data.length}
+            `;
         } 
         // Versiune 2: Dacă primești un obiect cu proprietăți
         else if (typeof data === 'object') {
