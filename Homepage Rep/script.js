@@ -491,8 +491,47 @@ class HomepageManager {
         try {
             // Caută programări în backend
             //const API_URL = 'http://localhost:8000';
-            const N8N_DELETE_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-cautare-programari';
-            const response = await fetch(`${API_URL}/api/appointments/search/${encodeURIComponent(patientName)}`);
+            const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-verificare-pacient';
+            // ------
+            // Împarte numele în părți
+            const nameParts = patientName.trim().split(' ');
+            let prenume = '';
+            let nume = '';
+            
+            if (nameParts.length >= 2) {
+                // Presupunem ordinea: prenume nume (ex: Teodor Simionescu)
+                prenume = nameParts.slice(0, -1).join(' ');
+                nume = nameParts[nameParts.length - 1];
+            } else {
+                // Dacă e doar un cuvânt, îl punem ca prenume
+                prenume = nameParts[0] || '';
+            }
+            
+            // Construiește URL-ul cu parametrii
+            const url = new URL(N8N_WEBHOOK_URL);
+            if (prenume) url.searchParams.append('prenume', prenume.toLowerCase());
+            if (nume) url.searchParams.append('nume', nume.toLowerCase());
+            
+            const ts = Date.now();
+            const dataString = `nume=${nume}&prenume=${prenume}&ts=${ts}`;
+            const encryptedData = await encryptRSA(dataString);
+            
+            const url_decoded=N8N_WEBHOOK_URL+`?data=${encodeURIComponent(encryptedData)}`;
+
+            console.log('Request URL:', url_decoded.toString());
+            
+            // Trimite request GET către n8n
+            const response = await fetch(url_decoded.toString(), {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                },
+                mode: 'cors'
+            });
+
+
+            // -------
+            //const response = await fetch(`${API_URL}/api/appointments/search/${encodeURIComponent(patientName)}`);
             
             if (!response.ok) {
                 if (response.status === 404) {
@@ -510,7 +549,7 @@ class HomepageManager {
             const data = await response.json();
             
             // Afișează lista de programări
-            this.displayAppointmentsList(data, patientName);
+            this.displayAppointmentsList(data.history, patientName);
             
         } catch (error) {
             console.error('Eroare la căutarea programărilor:', error);
@@ -529,7 +568,7 @@ class HomepageManager {
         const listContainer = document.getElementById('appointments-list');
         
         // Backend returnează un singur rezultat, dar îl putem trata ca array
-        const appointments = data.last_appointment ? [data.last_appointment] : [];
+        const appointments = data ? data : [];
         
         if (appointments.length === 0) {
             listContainer.innerHTML = `
@@ -547,20 +586,21 @@ class HomepageManager {
         `;
         
         appointments.forEach((apt, index) => {
-            const dateFormatted = new Date(apt.date).toLocaleDateString('ro-RO', {
+            
+            const dateFormatted = new Date(apt.data_programare).toLocaleDateString('ro-RO', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
             });
             
             html += `
-                <div class="appointment-card" data-appointment-id="${apt.id}" onclick="homepageManager.selectAppointment(${apt.id}, '${patientName}', '${dateFormatted}', '${apt.time}', '${apt.details?.replace(/'/g, "\\'")}')">
+                <div class="appointment-card" data-appointment-id="${apt.tally_id}" onclick="homepageManager.selectAppointment(${apt.tally_id}, '${patientName}', '${dateFormatted}', '${apt.ora_start.substring(0, 5) || 'N/A'}', '${apt.details?.replace(/'/g, "\\'")}')">
                     <div class="appointment-card-header">
                         <strong style="color: #1800ad;">📅 ${dateFormatted}</strong>
                     </div>
                     <div class="appointment-card-body">
-                        <p><strong>Oră:</strong> ${apt.time}</p>
-                        <p><strong>Detalii:</strong> ${apt.details || 'N/A'}</p>
+                        <p><strong>Oră:</strong> ${apt.ora_start.substring(0, 5) || 'N/A'}</p>
+                        <p><strong>Cabinet:</strong> ${apt.cabinet_medic.replace(/\b\w/g, char => char.toUpperCase()) || 'Nespecificat'}</p>
                     </div>
                 </div>
             `;
