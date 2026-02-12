@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ clinic_name }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='/sms_form_style.css') }}">
+</head>
+<body>
+
+<div class="container">
+    <div class="clinic-logo">
+        <img src="{{ clinic_logo }}" alt="{{ clinic_name }} Logo" style="width: 40%; height: auto; margin-bottom: 10px;">
+        <div style="font-weight: 700; color: #0056b3;">Confirmaţi programarea</div>
+    </div>
+
+    <div class="greeting">Salut, <strong>{{ patient_name }}</strong>!</div>
+    <p class="subtitle">Vă rugăm să confirmați programarea în clinica noastră.</p>
+<div class="appointment-card">
+    <div class="info-group">
+        <i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="7%" height="7%" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:4px; vertical-align:text-bottom;">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            Data
+        </i>
+        <span>{{ appointment_date }}</span>
+    </div>
+    <div class="info-group">
+        <i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline; margin-right:4px; vertical-align:text-bottom;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Ora
+        </i>
+        <span>{{ appointment_time }}</span>
+    </div>
+
+</div>
+
+    <div class="actions" id="action-buttons">
+        <button class="btn btn-confirm" onclick="handleAction('confirmat')">Confirm programarea</button>
+        <button class="btn btn-reschedule" onclick="handleAction('reprogramat')">Vreau să reprogramez</button>
+        <button class="btn btn-noshow" onclick="handleAction('anulat')">Anulez programarea</button>
+    </div>
+
+    <div id="status-message"></div>
+    
+    <div class="footer">                    
+        <p >
+            <a href="https://www.transfit.site/" target="_blank" style="text-decoration: none; color: inherit;">&copy; 2026 Transfit SRL</a>
+        </p>       
+    </div>     
+</div>
+
+<script>
+    const apiResponse = {
+        patientName: "{{ patient_name }}",
+        date: "{{ appointment_date }}",
+        time: "{{ appointment_time }}",
+        appointmentId: "{{ tally_id}}",
+        current_status: "{{ status_confirmare}}",
+        clinic_Id: "{{ clinic_id }}"
+    };
+
+    async function handleAction(status) {
+        const statusBox = document.getElementById('status-message');
+        const actionButtons = document.getElementById('action-buttons');
+        
+        // Disable buttons to prevent double-clicks
+        actionButtons.style.opacity = '0.5';
+        actionButtons.style.pointerEvents = 'none';
+
+        // Simulate API Update call
+        console.log(`Sending update to API: Appointment ${apiResponse.appointmentId} is now ${status}`);
+
+        // UI Feedback
+        statusBox.style.display = 'block';
+        
+        if (status === 'confirmat') {
+            statusBox.style.backgroundColor = '#d4edda';
+            statusBox.style.color = '#155724';
+            statusBox.innerHTML = "<p><strong>Programare confirmată.</strong></p><p>Am primit răspunsul. Vă așteptăm cu drag!</p>";
+
+        } else if (status === 'reprogramat') {
+            statusBox.style.backgroundColor = '#fff3cd';
+            statusBox.style.color = '#856404';
+            statusBox.innerHTML = "<p><strong>Cerere înregistrată.</strong></p><p>Coordonatorul nostru vă va contacta în curând pentru a stabili un nou program.</p>";
+        } else {
+            statusBox.style.backgroundColor = '#f8d7da';
+            statusBox.style.color = '#721c24';
+            statusBox.innerHTML = "<p><strong>Anulare înregistrată.</strong></p><p>Acest slot a fost eliberat. Vă rugăm să ne contactați pentru a reprograma.</p>";
+        }
+        try{
+            const response = await fetch(`/api/${apiResponse.clinic_Id}/status-update/${apiResponse.appointmentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    new_status: status
+                })
+            });
+
+            if(!response.ok){
+                throw new Error('Update failed');
+            }
+        }catch(error){
+                console.error('Error updating status:', error);
+        }
+    }
+</script>
+
+</body>
+</html>
