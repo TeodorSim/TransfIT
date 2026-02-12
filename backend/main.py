@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 import json
@@ -152,7 +153,8 @@ def require_admin(request: Request, db: Session) -> User:
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    if user.email.lower() not in ADMIN_EMAILS:
+    is_admin = (user.role or "").lower() == "admin" or user.email.lower() in ADMIN_EMAILS
+    if not is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     return user
@@ -178,18 +180,22 @@ def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=409, detail="Email already exists")
 
+    normalized_email = payload.email.lower()
+    role = "admin" if normalized_email in ADMIN_EMAILS else "user"
     user = User(
-        email=payload.email.lower(),
-        password_hash=hash_password(payload.password)
+        email=normalized_email,
+        password_hash=hash_password(payload.password),
+        role=role
     )
     db.add(user)
     db.commit()
     db.refresh(user)
-    return UserResponse(id=user.id, email=user.email)
+    return UserResponse(id=user.id, email=user.email, role=user.role)
 
 @app.post("/api/auth/login", response_model=AuthResponse)
 def login_user(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    email = payload.email.lower()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -205,7 +211,7 @@ def login_user(payload: LoginRequest, response: Response, db: Session = Depends(
     )
 
     return AuthResponse(
-        user=UserResponse(id=user.id, email=user.email),
+        user=UserResponse(id=user.id, email=user.email, role=user.role),
         expires_at=session.expires_at
     )
 
@@ -219,7 +225,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    return UserResponse(id=user.id, email=user.email)
+    return UserResponse(id=user.id, email=user.email, role=user.role)
 
 @app.post("/api/auth/logout")
 def logout_user(request: Request, response: Response, db: Session = Depends(get_db)):
@@ -236,7 +242,7 @@ def list_users(request: Request, db: Session = Depends(get_db)):
     """Listează toți utilizatorii înregistrați (doar admin)."""
     require_admin(request, db)
     users = db.query(User).order_by(User.id.asc()).all()
-    return [{"id": u.id, "email": u.email} for u in users]
+    return [{"id": u.id, "email": u.email, "role": u.role} for u in users]
 
 @app.get("/api/form-links")
 def get_form_links(email: Optional[str] = None):
@@ -288,6 +294,29 @@ def search_patient_appointments(patient_name: str):
                     "nume": nume.lower()
                 }
             )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+@app.get("/api/appointments/reprogramari")
+def list_reprogramari(status: Optional[str] = None, from_: Optional[str] = None, to: Optional[str] = None):
+    """Lista programărilor care necesită reprogramare sau anulare."""
+    webhook_url = "https://transfit.site/n8n/webhook/imp-verificare-pacient"
+
+    params = {}
+    if status:
+        params["status"] = status
+    if from_:
+        params["from"] = from_
+    if to:
+        params["to"] = to
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(webhook_url, params=params)
         response.raise_for_status()
         return response.json()
     except httpx.HTTPStatusError as exc:

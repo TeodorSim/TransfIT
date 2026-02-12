@@ -29,6 +29,7 @@ class RegisterRequest(BaseModel):
 class UserResponse(BaseModel):
     id: int
     email: str
+    role: str
 
 
 class AuthResponse(BaseModel):
