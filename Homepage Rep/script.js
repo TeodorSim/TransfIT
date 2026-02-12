@@ -105,7 +105,11 @@ class HomepageManager {
             <div class="form-layout">
                 <div class="form-container">
                     <div class="form-header">
-                        <h3>Formular programare</h3>
+                        <h3>Formular</h3>
+                        <div class="calendar-actions-inline">
+                            <button id="form-programare-btn" class="btn-secondary form-toggle-btn" title="Formular programare">Programare</button>
+                            <button id="form-disponibilitate-btn" class="btn-secondary form-toggle-btn" title="Formular disponibilitate">Disponibilitate</button>
+                        </div>
                     </div>
                     <iframe 
                         src="https://tally.so/r/obeJvO" 
@@ -138,6 +142,44 @@ class HomepageManager {
                 </div>
             </div>
         `;
+
+        const formIframe = document.querySelector('.tally-iframe');
+        const programareBtn = document.getElementById('form-programare-btn');
+        const disponibilitateBtn = document.getElementById('form-disponibilitate-btn');
+        const currentLinks = {
+            programare: 'https://tally.so/r/obeJvO',
+            disponibilitate: 'https://tally.so/r/vGDVKQ'
+        };
+
+        if (formIframe && programareBtn && disponibilitateBtn) {
+            const loadForm = (baseUrl) => {
+                const cacheBuster = `ts=${Date.now()}`;
+                const separator = baseUrl.includes('?') ? '&' : '?';
+                formIframe.setAttribute('src', `${baseUrl}${separator}${cacheBuster}`);
+            };
+
+            programareBtn.addEventListener('click', () => {
+                loadForm(currentLinks.programare);
+            });
+            disponibilitateBtn.addEventListener('click', () => {
+                loadForm(currentLinks.disponibilitate);
+            });
+
+            const authData = this.getAuthCookie();
+            const email = authData?.username || '';
+            if (email) {
+                fetch(`/api/form-links?email=${encodeURIComponent(email)}`)
+                    .then(response => response.ok ? response.json() : null)
+                    .then((data) => {
+                        if (data?.programare) currentLinks.programare = data.programare;
+                        if (data?.disponibilitate) currentLinks.disponibilitate = data.disponibilitate;
+                        loadForm(currentLinks.programare);
+                    })
+                    .catch(() => {
+                        loadForm(currentLinks.programare);
+                    });
+            }
+        }
 
         // Configurează acțiunea butonului pentru căutarea pacientului
         const btn = document.getElementById('save-appointment-btn');
@@ -585,8 +627,20 @@ class HomepageManager {
                 <div class="appointments-grid">
         `;
         
+        const resolveTallyId = (apt) => {
+            return (
+                apt.tally_id ??
+                apt['tally id'] ??
+                apt.tallyId ??
+                apt.tallyID ??
+                ''
+            );
+        };
+
         appointments.forEach((apt, index) => {
-            
+            const rawTallyId = resolveTallyId(apt);
+            const tallyId = String(rawTallyId ?? '').replace(/'/g, "\\'");
+            console.log('Programare index:', index, 'tally_id:', rawTallyId, 'apt:', apt);
             const dateFormatted = new Date(apt.data_programare).toLocaleDateString('ro-RO', {
                 year: 'numeric',
                 month: 'long',
@@ -594,7 +648,7 @@ class HomepageManager {
             });
             
             html += `
-                <div class="appointment-card" data-appointment-id="${apt.tally_id}" onclick="homepageManager.selectAppointment(${apt.tally_id}, '${patientName}', '${dateFormatted}', '${apt.ora_start.substring(0, 5) || 'N/A'}', '${apt.details?.replace(/'/g, "\\'")}')">
+                <div class="appointment-card" data-appointment-id="${tallyId}" onclick="homepageManager.selectAppointment('${tallyId}', '${patientName}', '${dateFormatted}', '${apt.ora_start.substring(0, 5) || 'N/A'}', '${apt.details?.replace(/'/g, "\\'")}')">
                     <div class="appointment-card-header">
                         <strong style="color: #1800ad;">📅 ${dateFormatted}</strong>
                     </div>
@@ -615,13 +669,13 @@ class HomepageManager {
     }
 
     // Selectează o programare pentru ștergere
-    selectAppointment(id, patientName, date, time, details) {
+    selectAppointment(tallyId, patientName, date, time, details) {
         // Marchează card-ul ca selectat
         document.querySelectorAll('.appointment-card').forEach(card => {
             card.classList.remove('selected');
         });
         
-        const selectedCard = document.querySelector(`[data-appointment-id="${id}"]`);
+        const selectedCard = document.querySelector(`[data-appointment-id="${tallyId}"]`);
         if (selectedCard) {
             selectedCard.classList.add('selected');
         }
@@ -633,15 +687,39 @@ class HomepageManager {
             <strong>Pacient:</strong> ${patientName}<br>
             <strong>Data:</strong> ${date} la ${time}<br>
             <strong>Detalii:</strong> ${details}<br>
-            <button id="confirm-delete-btn" class="btn-danger" style="margin-top: 1rem;">
-                🗑️ Șterge această programare
+            <button id="confirm-delete-webhook-btn" class="btn-danger" style="margin-top: 1rem;">
+                🗑️ Trimite cerere de ștergere
             </button>
         `;
         
-        // Adaugă eveniment pentru butonul de ștergere
-        const deleteBtn = document.getElementById('confirm-delete-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => this.deleteAppointment(id, patientName));
+        // Adaugă eveniment pentru trimiterea webhook-ului
+        const deleteWebhookBtn = document.getElementById('confirm-delete-webhook-btn');
+        if (deleteWebhookBtn) {
+            deleteWebhookBtn.addEventListener('click', () => this.sendDeleteWebhook(tallyId, patientName));
+        }
+    }
+
+    /**
+     * Trimite webhook pentru ștergerea unei programări (folosește tally_id)
+     * @param {string} tallyId - ID-ul programării din Tally
+     * @param {string} patientName - Numele pacientului (pentru mesaje)
+     */
+    async sendDeleteWebhook(tallyId, patientName) {
+        if (!tallyId) {
+            this.showNotification('Nu există Tally ID pentru această programare.', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/webhooks/delete-appointment?data=${encodeURIComponent(tallyId)}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            this.showNotification(`Cererea de ștergere a fost trimisă pentru ${patientName}.`, 'success');
+        } catch (error) {
+            console.error('Eroare la trimiterea webhook-ului:', error);
+            this.showNotification('Eroare la trimiterea cererii de ștergere.', 'error');
         }
     }
 
