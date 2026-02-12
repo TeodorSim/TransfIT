@@ -1,5 +1,5 @@
-// Authentication and Session Management with Google OAuth
-// Handles login, session persistence with encrypted cookies
+// Autentificare si management sesiune cu Google OAuth
+// Gestioneaza login-ul si persistenta sesiunii cu cookies criptate
 
 class AuthManager {
     constructor() {
@@ -122,7 +122,7 @@ class AuthManager {
         });
     }
 
-    // Render Google Sign-In button
+    // Randare buton Google Sign-In
     renderGoogleButton(elementId) {
         if (!window.google) {
             console.error('Google API not loaded');
