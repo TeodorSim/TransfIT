@@ -24,6 +24,7 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=6, max_length=128)
+    role: Optional[str] = "user"  # <--- Add this line
 
 
 class UserResponse(BaseModel):

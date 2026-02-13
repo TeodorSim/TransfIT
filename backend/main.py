@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 import secrets
 from passlib.context import CryptContext
+import hashlib
 
 from database import get_db, engine
 from models import Base, User, UserSession
@@ -174,13 +175,16 @@ def serve_config():
 
 @app.post("/api/auth/register", response_model=UserResponse, status_code=201)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == payload.email.lower()).first()
+    email_normalized = payload.email.lower().strip()
+    existing = db.query(User).filter(User.email == email_normalized).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already exists")
-
+    email_hash = hashlib.sha256(email_normalized.encode()).hexdigest()
     user = User(
-        email=payload.email.lower(),
-        password_hash=hash_password(payload.password)
+        email=email_normalized,
+        email_hash=email_hash,
+        password_hash=hash_password(payload.password),
+        role=payload.role
     )
     db.add(user)
     db.commit()
@@ -304,8 +308,10 @@ def list_google_calendar_events(
     """Listește evenimentele din Google Calendar al utilizatorului autentificat."""
     if not timeMin:
         timeMin = datetime.utcnow().isoformat() + "Z"
+    
+    cal_id = user.calendar_id if user.calendar_id else "primary"
 
-    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+    url = f"https://www.googleapis.com/calendar/v3/calendars/{cal_id}/events"
     params = {
         "maxResults": maxResults,
         "timeMin": timeMin,
@@ -362,6 +368,62 @@ def create_google_calendar_event(
         raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+@app.get("/api/google/calendar/events")
+def list_google_calendar_events(
+    request: Request, # Add request to get session
+    db: Session = Depends(get_db), # Add DB session
+    maxResults: int = 10,
+    timeMin: Optional[str] = None,
+    access_token: str = Depends(get_bearer_token)
+):
+    # 1. Get the current user from the session
+    user_info = get_current_user(request, db)
+    user = db.query(User).filter(User.id == user_info.id).first()
+
+    # 2. Determine which calendar to use
+    # Use the specific ID we patched in the DB, otherwise fall back to primary
+    target_calendar = user.calendar_id if user.calendar_id else "primary"
+
+    if not timeMin:
+        timeMin = datetime.now(timezone.utc).isoformat()
+
+    # 3. Inject the dynamic ID into the URL
+    url = f"https://www.googleapis.com/calendar/v3/calendars/{target_calendar}/events"
+    
+    params = {
+        "maxResults": maxResults,
+        "timeMin": timeMin,
+        "singleEvents": "true",
+        "orderBy": "startTime"
+    }
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(
+                url,
+                headers={"Authorization": f"Bearer {access_token}"},
+                params=params
+            )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+
+@app.patch("/api/auth/me/calendar")
+def update_calendar_id(
+    calendar_id: str, 
+    request: Request, 
+    db: Session = Depends(get_db)
+):
+    session = get_session_from_cookie(request, db)
+    if not session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+        
+    user = db.query(User).filter(User.id == session.user_id).first()
+    user.calendar_id = calendar_id
+    db.commit()
+    return {"message": "Calendar ID updated successfully"}
 
 if __name__ == "__main__":
     import uvicorn

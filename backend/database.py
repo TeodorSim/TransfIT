@@ -7,17 +7,28 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Încarcă variabile de mediu din .env
 load_dotenv()
 
 # URL conexiune PostgreSQL
 # Format: postgresql://user:password@host:port/database
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/transfit"
-)
 
+# Get the path to the directory where database.py is located
+BASE_DIR = Path(__file__).resolve().parent
+
+# Explicitly point to the .env file in the same directory
+load_dotenv(dotenv_path=BASE_DIR / ".env")
+
+DATABASE_URL = os.getenv("DATABASE_URL_LOGIN")
+
+# Add a check to prevent the "None" crash with a helpful message
+if not DATABASE_URL:
+    raise RuntimeError(
+        f"DATABASE_URL_LOGIN not found! Looked in: {BASE_DIR / '.env'}. "
+        "Please ensure the .env file exists and contains DATABASE_URL_LOGIN."
+    )
 # Creare engine SQLAlchemy
 engine = create_engine(
     DATABASE_URL,

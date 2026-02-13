@@ -91,7 +91,7 @@
             statusBox.style.backgroundColor = '#fff3cd';
             statusBox.style.color = '#856404';
             statusBox.innerHTML = "<p><strong>Cerere înregistrată.</strong></p><p>Coordonatorul nostru vă va contacta în curând pentru a stabili un nou program.</p>";
-        } else {
+        } else if (status === 'anulat') {
             statusBox.style.backgroundColor = '#f8d7da';
             statusBox.style.color = '#721c24';
             statusBox.innerHTML = "<p><strong>Anulare înregistrată.</strong></p><p>Acest slot a fost eliberat. Vă rugăm să ne contactați pentru a reprograma.</p>";

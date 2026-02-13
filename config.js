@@ -2,7 +2,7 @@
 // Run: python3 generate_config.py to regenerate
 
 window.TransfitConfig = {
-    GOOGLE_CLIENT_ID: '723304933244-t6ap9boad5s3eeiut3anjqo6ejpk1p5j.apps.googleusercontent.com',
+    GOOGLE_CLIENT_ID: '486538835354-isnteucgj0ceba0us2d3okdh7k54jfab.apps.googleusercontent.com',
     COOKIE_SECRET: '',
     ENCRYPTION_KEY: '',
     RSA_PUBLIC_KEY: ``,
