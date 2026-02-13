@@ -302,16 +302,9 @@ class HomepageManager {
             </div>
             <div class="form-layout two-column">
                 <div class="form-container">
-                    <div class="form-header">
-                        <!--<h3>Listă reprogramări</h3>-->
-                        <div class="calendar-actions-inline reprogramari-filters">
-                            <select id="reprogramari-status" class="filter-input">
-                                <option value="toate">Toate</option>
-                                <option value="reprogramare">Reprogramare</option>
-                                <option value="anulare">Anulare</option>
-                            </select>
-                            <input type="date" id="reprogramari-from" class="filter-input" />
-                            <input type="date" id="reprogramari-to" class="filter-input" />
+                    <div class="form-header reprogramari-header">
+                        <h3>Listă reprogramări</h3>
+                        <div class="calendar-actions-inline">
                             <button id="reprogramari-refresh" class="btn-secondary" title="Reîncarcă lista">🔄</button>
                         </div>
                     </div>
@@ -341,21 +334,20 @@ class HomepageManager {
             </div>
         `;
 
-        const statusEl = document.getElementById('reprogramari-status');
-        const fromEl = document.getElementById('reprogramari-from');
-        const toEl = document.getElementById('reprogramari-to');
-
-        const status = statusEl ? statusEl.value : 'toate';
-        const fromDate = fromEl ? fromEl.value : '';
-        const toDate = toEl ? toEl.value : '';
-
         try {
-            const url = new URL('/api/appointments/reprogramari', window.location.origin);
-            if (status && status !== 'toate') url.searchParams.set('status', status);
-            if (fromDate) url.searchParams.set('from', fromDate);
-            if (toDate) url.searchParams.set('to', toDate);
+            const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook-test/imp-reprogramare-pacient';
+            const ts = Date.now();
+            const dataString = `ts=${ts}`;
+            const encryptedData = await encryptRSA(dataString);
+            const urlDecoded = `${N8N_WEBHOOK_URL}?data=${encodeURIComponent(encryptedData)}`;
 
-            const response = await fetch(url.toString());
+            const response = await fetch(urlDecoded, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                mode: 'cors'
+            });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -390,16 +382,54 @@ class HomepageManager {
             return;
         }
 
+        const capitalizeWords = (value) => {
+            return String(value || '')
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        };
+
+        const formatDateLabel = (value) => {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'N/A';
+
+            const parts = new Intl.DateTimeFormat('ro-RO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }).formatToParts(date);
+
+            const day = parts.find(part => part.type === 'day')?.value || '';
+            const monthRaw = parts.find(part => part.type === 'month')?.value || '';
+            const year = parts.find(part => part.type === 'year')?.value || '';
+            const month = monthRaw ? monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1) : '';
+
+            return [day, month, year].filter(Boolean).join(' ');
+        };
+
+        const formatTime = (value) => {
+            if (!value || value === 'N/A') return 'N/A';
+            const str = String(value);
+            if (str.includes(':')) return str.slice(0, 5);
+            return str;
+        };
+
         const rows = items.map((apt) => {
-            const name = apt.patient || apt.pacient || apt.nume_complet ||
+            const rawName = apt.patient || apt.pacient || apt.nume_complet ||
+                [apt.first_name, apt.last_name].filter(Boolean).join(' ') ||
                 [apt.prenume, apt.nume].filter(Boolean).join(' ') || 'N/A';
+            const name = rawName === 'N/A' ? rawName : capitalizeWords(rawName);
             const dateValue = apt.data_programare || apt.data || apt.date || apt.appointment_date;
-            const dateLabel = dateValue
-                ? new Date(dateValue).toLocaleDateString('ro-RO', { year: 'numeric', month: 'long', day: 'numeric' })
-                : 'N/A';
-            const time = apt.ora_start || apt.time || apt.appointment_time || 'N/A';
-            const status = apt.status || apt.stare || apt.tip || 'N/A';
-            const reason = apt.motiv || apt.reason || apt.detalii || apt.details || '';
+            const dateLabel = formatDateLabel(dateValue);
+            const time = formatTime(apt.ora_start || apt.time || apt.appointment_time || 'N/A');
+            const rawDoctor = apt.cabinet_medic || apt.medic || apt.doctor || apt.doctor_name || '';
+            const doctor = rawDoctor ? capitalizeWords(rawDoctor) : '';
+            const status = apt.status_confirmare || apt.status || apt.stare || apt.tip || 'N/A';
+            const reason = apt.tip_vizita || apt.motiv || apt.reason || apt.detalii || apt.details || '';
+            const phone = apt.phone || apt.telefon || apt.tel || '';
 
             return `
                 <div class="appointment-card reprogramari-card">
@@ -407,6 +437,9 @@ class HomepageManager {
                         <strong style="color: #1800ad;">🔁 ${name}</strong>
                     </div>
                     <div class="appointment-card-body">
+                        <p><strong>Pacient:</strong> ${name}</p>
+                        <p><strong>Telefon:</strong> ${phone || 'N/A'}</p>
+                        <p><strong>Medic:</strong> ${doctor || 'N/A'}</p>
                         <p><strong>Data:</strong> ${dateLabel} ${time !== 'N/A' ? `la ${time}` : ''}</p>
                         <p><strong>Status:</strong> ${status}</p>
                         ${reason ? `<p><strong>Motiv:</strong> ${reason}</p>` : ''}
@@ -918,8 +951,8 @@ class HomepageManager {
         // URL webhook n8n
         const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-verificare-pacient';
         
-        // Afișează loading
-        bannerEl.innerHTML = `<strong>Se caută...</strong>`;
+        // Curăță bannerul înainte de încărcare
+        bannerEl.innerHTML = '';
         
         try {
             // Împarte numele în părți
@@ -1019,31 +1052,64 @@ class HomepageManager {
 
     // Afișează datele primite din n8n
     displayAppointmentData(data, bannerEl, patientName) {
+        const normalizeValue = (value) => {
+            if (value === null || value === undefined) return 'N/A';
+            const str = String(value).trim();
+            if (!str || str.toLowerCase() === 'null') return 'N/A';
+            return str;
+        };
+
+        const capitalizeWords = (value) => {
+            const text = normalizeValue(value);
+            if (text === 'N/A') return text;
+            return text
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        };
+
+        const formatDateLabel = (value) => {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'N/A';
+
+            const parts = new Intl.DateTimeFormat('ro-RO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }).formatToParts(date);
+
+            const day = parts.find(part => part.type === 'day')?.value || '';
+            const monthRaw = parts.find(part => part.type === 'month')?.value || '';
+            const year = parts.find(part => part.type === 'year')?.value || '';
+            const month = monthRaw ? monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1) : '';
+
+            return [day, month, year].filter(Boolean).join(' ');
+        };
+
+        const formatTime = (value) => {
+            const text = normalizeValue(value);
+            if (text === 'N/A') return text;
+            if (text.includes(':')) return text.slice(0, 5);
+            return text;
+        };
+
         // Versiune 1: Dacă primești un array de programări
         if (Array.isArray(data.history)) {
             data.history.forEach((appointment, index) => {
-                const dateFormatted = new Date(appointment.data_programare).toLocaleDateString('ro-RO', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                
-                const timeFormatted = appointment.ora_start ? appointment.ora_start.substring(0, 5) : 'N/A';
-                
-                const medicFormatted = appointment.cabinet_medic
-                    .toString()
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ');
-                
-                const details = appointment.info_relevante ? appointment.info_relevante : 'Nu au fost înregistrate alte detalii.';
+                const dateFormatted = formatDateLabel(appointment.data_programare);
+                const timeFormatted = formatTime(appointment.ora_start);
+                const medicFormatted = capitalizeWords(appointment.cabinet_medic);
+                const phone = normalizeValue(appointment.phone || appointment.telefon || appointment.tel);
+                const detailsRaw = normalizeValue(appointment.info_relevante);
                 
                 bannerEl.innerHTML += `
                     <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(229, 231, 235, 0.3);">
                         <strong>Programare ${index + 1}:</strong><br>
-                        <strong>Data:</strong> ${dateFormatted} la ${timeFormatted}<br>
+                        <strong>Data:</strong> ${dateFormatted} ${timeFormatted !== 'N/A' ? `la ${timeFormatted}` : ''}<br>
                         <strong>Medic:</strong> ${medicFormatted}<br>
-                        <strong>Detalii:</strong> ${details}<br>
+                        <strong>Telefon:</strong> ${phone}<br>
                     </div>
                 `;
             });
@@ -1052,22 +1118,19 @@ class HomepageManager {
         else if (typeof data === 'object') {
             // Adaptează câmpurile în funcție de structura JSON-ului tău
             const dateStr = data.date || data.data || data.appointment_date;
-            const dateFormatted = dateStr ? new Date(dateStr).toLocaleDateString('ro-RO', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            }) : 'N/A';
+            const dateFormatted = formatDateLabel(dateStr);
+            const timeFormatted = formatTime(data.time || data.ora || data.appointment_time);
+            const medicFormatted = capitalizeWords(data.cabinet_medic || data.medic || data.doctor || data.doctor_name);
+            const phone = normalizeValue(data.phone || data.telefon || data.tel);
+            const patient = capitalizeWords(data.patient_name || data.nume_complet || data.prenume + ' ' + data.nume || patientName);
             
             bannerEl.innerHTML = `
-                <strong>Pacient:</strong> ${data.patient_name || data.nume_complet || data.prenume + ' ' + data.nume || patientName}<br>
-                <strong>Data:</strong> ${dateFormatted} la ${data.time || data.ora || data.appointment_time || 'N/A'}<br>
-                <strong>Detalii:</strong> ${data.details || data.detalii || data.description || 'N/A'}
+                <strong>Pacient:</strong> ${patient}<br>
+                <strong>Medic:</strong> ${medicFormatted}<br>
+                <strong>Telefon:</strong> ${phone}<br>
+                <strong>Data:</strong> ${dateFormatted} ${timeFormatted !== 'N/A' ? `la ${timeFormatted}` : ''}<br>
             `;
-            
-            // Adaugă orice alte câmpuri relevante din JSON
-            if (data.phone || data.telefon) {
-                bannerEl.innerHTML += `<br><strong>Telefon:</strong> ${data.phone || data.telefon}`;
-            }
+
             if (data.email) {
                 bannerEl.innerHTML += `<br><strong>Email:</strong> ${data.email}`;
             }
