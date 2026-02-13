@@ -244,6 +244,15 @@ body {
     align-items: stretch;
 }
 
+.form-layout.two-column {
+    grid-template-columns: 1fr 1.25fr;
+}
+
+.form-layout.single-column {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 700px;
+}
+
 /* Rând cu input și buton deasupra formularului */
 .last-input {
     display: flex;
@@ -297,8 +306,12 @@ body {
 
 /* Fallback responsiv: pe ecrane mici le punem una sub alta */
 @media (max-width: 992px) {
-    .form-layout {
+    .form-layout:not(.two-column) {
         grid-template-columns: 1fr; /* una sub alta */
+    }
+
+    .form-layout.two-column {
+        grid-template-columns: 1fr 1.25fr;
     }
 }
 
@@ -360,6 +373,16 @@ body {
     border-bottom: 2px solid rgba(24, 0, 173, 0.1);
 }
 
+.reprogramari-header {
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+
+.reprogramari-header h3 {
+    white-space: nowrap;
+    margin-right: 8px;
+}
+
 .calendar-header h3,
 .form-header h3 {
     margin: 0;
@@ -372,6 +395,37 @@ body {
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: nowrap;
+}
+
+.reprogramari-filters .filter-input {
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid rgba(24, 0, 173, 0.25);
+    border-radius: 6px;
+    background: #fff;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.reprogramari-filters {
+    flex-wrap: nowrap;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+}
+
+.reprogramari-filters .filter-input,
+.reprogramari-filters .btn-secondary {
+    min-width: 140px;
+}
+
+.reprogramari-filters .filter-input {
+    flex: 1 1 0;
+}
+
+.reprogramari-filters .btn-secondary {
+    flex: 0 0 auto;
 }
 
 .calendar-actions-inline input {

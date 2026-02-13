@@ -6,18 +6,10 @@ class HomepageManager {
     /**
      * Constructorul clasei HomepageManager
      * - Inițializează referințele către elementele de navigare
-     * - Configurează date mock pentru testare (va fi înlocuit cu API real)
+    * - Pregătește interfața și listener-ele
      */
     constructor() {
         this.navItems = document.querySelectorAll('.nav-item');
-        // Bază de date mock pentru programări (ulterior va fi înlocuită cu API real)
-        this.mockAppointments = [
-            { patient: 'Popescu Ion', date: '2026-01-20', time: '10:00', details: 'Consultație fizioterapie' },
-            { patient: 'Ionescu Maria', date: '2026-01-22', time: '14:30', details: 'Tratament recuperare post-operatorie' },
-            { patient: 'Georgescu Andrei', date: '2026-01-23', time: '09:00', details: 'Masaj terapeutic' },
-            { patient: 'Popescu Ion', date: '2026-01-24', time: '11:00', details: 'Control fizioterapie' },
-            { patient: 'Dumitrescu Elena', date: '2026-01-25', time: '16:00', details: 'Kinetoterapie' }
-        ];
         this.init();
     }
 
@@ -71,6 +63,9 @@ class HomepageManager {
             case 'stergere':
                 this.handleStergere();
                 break;
+            case 'reprogramari':
+                this.handleReprogramari();
+                break;
             default:
                 console.log('Unknown action');
         }
@@ -102,9 +97,9 @@ class HomepageManager {
             <div class="content-header">
                 <h1>Creare programare</h1>
             </div>
-            <div class="form-layout">
+            <div class="form-layout two-column">
                 <div class="form-container">
-                    <div class="form-header">
+                    <div class="form-header reprogramari-header">
                         <h3>Formular</h3>
                         <div class="calendar-actions-inline">
                             <button id="form-programare-btn" class="btn-secondary form-toggle-btn" title="Formular programare">Programare</button>
@@ -226,7 +221,7 @@ class HomepageManager {
             <div class="content-header">
                 <h1>Ștergere programare</h1>
             </div>
-            <div class="form-layout">
+            <div class="form-layout two-column">
                 <div class="form-container">
                     <div class="form-header">
                         <h3>Programări pacient</h3>
@@ -289,6 +284,178 @@ class HomepageManager {
         }
 
         this.initInlineCalendar('calendar-status-delete', 'calendar-events-delete');
+    }
+
+    /**
+     * Afișează interfața pentru reprogramări/anulări
+     * - Listează programările marcate pentru reprogramare sau anulare
+     * - Permite filtrare după dată și refresh manual
+     * - Afișează calendarul pentru context
+     */
+    handleReprogramari() {
+        console.log('Afișare tab reprogramări');
+        const mainContent = document.querySelector('.main-content');
+        mainContent.innerHTML = `
+            <div class="content-header">
+                <h1>Reprogramări</h1>
+                <p>Programări care necesită reprogramare sau anulare.</p>
+            </div>
+            <div class="form-layout two-column">
+                <div class="form-container">
+                    <div class="form-header reprogramari-header">
+                        <h3>Listă reprogramări</h3>
+                        <div class="calendar-actions-inline">
+                            <button id="reprogramari-refresh" class="btn-secondary" title="Reîncarcă lista">🔄</button>
+                        </div>
+                    </div>
+                    <div class="appointments-list-container" id="reprogramari-list">
+                        <div style="text-align: center; padding: 2rem; color: #666;">
+                            <p>Apăsați refresh pentru a încărca lista.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const refreshBtn = document.getElementById('reprogramari-refresh');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.loadReprogramariList());
+        }
+
+    }
+
+    async loadReprogramariList() {
+        const listContainer = document.getElementById('reprogramari-list');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <strong>Se încarcă...</strong>
+            </div>
+        `;
+
+        try {
+            const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook-test/imp-reprogramare-pacient';
+            const ts = Date.now();
+            const dataString = `ts=${ts}`;
+            const encryptedData = await encryptRSA(dataString);
+            const urlDecoded = `${N8N_WEBHOOK_URL}?data=${encodeURIComponent(encryptedData)}`;
+
+            const response = await fetch(urlDecoded, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                mode: 'cors'
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.renderReprogramariList(data);
+        } catch (error) {
+            console.error('Eroare la încărcarea reprogramărilor:', error);
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <p>Nu s-a putut încărca lista.</p>
+                </div>
+            `;
+            this.showNotification('Eroare la încărcarea reprogramărilor', 'error');
+        }
+    }
+
+    renderReprogramariList(data) {
+        const listContainer = document.getElementById('reprogramari-list');
+        if (!listContainer) return;
+
+        const items = Array.isArray(data)
+            ? data
+            : (data?.items || data?.results || data?.history || []);
+
+        if (!items.length) {
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #666;">
+                    <p>Nu există reprogramări pentru filtrul selectat.</p>
+                </div>
+            `;
+            return;
+        }
+
+        const capitalizeWords = (value) => {
+            return String(value || '')
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        };
+
+        const formatDateLabel = (value) => {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'N/A';
+
+            const parts = new Intl.DateTimeFormat('ro-RO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }).formatToParts(date);
+
+            const day = parts.find(part => part.type === 'day')?.value || '';
+            const monthRaw = parts.find(part => part.type === 'month')?.value || '';
+            const year = parts.find(part => part.type === 'year')?.value || '';
+            const month = monthRaw ? monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1) : '';
+
+            return [day, month, year].filter(Boolean).join(' ');
+        };
+
+        const formatTime = (value) => {
+            if (!value || value === 'N/A') return 'N/A';
+            const str = String(value);
+            if (str.includes(':')) return str.slice(0, 5);
+            return str;
+        };
+
+        const rows = items.map((apt) => {
+            const rawName = apt.patient || apt.pacient || apt.nume_complet ||
+                [apt.first_name, apt.last_name].filter(Boolean).join(' ') ||
+                [apt.prenume, apt.nume].filter(Boolean).join(' ') || 'N/A';
+            const name = rawName === 'N/A' ? rawName : capitalizeWords(rawName);
+            const dateValue = apt.data_programare || apt.data || apt.date || apt.appointment_date;
+            const dateLabel = formatDateLabel(dateValue);
+            const time = formatTime(apt.ora_start || apt.time || apt.appointment_time || 'N/A');
+            const rawDoctor = apt.cabinet_medic || apt.medic || apt.doctor || apt.doctor_name || '';
+            const doctor = rawDoctor ? capitalizeWords(rawDoctor) : '';
+            const status = apt.status_confirmare || apt.status || apt.stare || apt.tip || 'N/A';
+            const reason = apt.tip_vizita || apt.motiv || apt.reason || apt.detalii || apt.details || '';
+            const phone = apt.phone || apt.telefon || apt.tel || '';
+
+            return `
+                <div class="appointment-card reprogramari-card">
+                    <div class="appointment-card-header">
+                        <strong style="color: #1800ad;">🔁 ${name}</strong>
+                    </div>
+                    <div class="appointment-card-body">
+                        <p><strong>Pacient:</strong> ${name}</p>
+                        <p><strong>Telefon:</strong> ${phone || 'N/A'}</p>
+                        <p><strong>Medic:</strong> ${doctor || 'N/A'}</p>
+                        <p><strong>Data:</strong> ${dateLabel} ${time !== 'N/A' ? `la ${time}` : ''}</p>
+                        <p><strong>Status:</strong> ${status}</p>
+                        ${reason ? `<p><strong>Motiv:</strong> ${reason}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        listContainer.innerHTML = `
+            <div style="padding: 1rem;">
+                <h3 style="margin-bottom: 1rem; color: #1800ad;">Reprogramări (${items.length})</h3>
+                <div class="appointments-grid">
+                    ${rows}
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -784,8 +951,8 @@ class HomepageManager {
         // URL webhook n8n
         const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-verificare-pacient';
         
-        // Afișează loading
-        bannerEl.innerHTML = `<strong>Se caută...</strong>`;
+        // Curăță bannerul înainte de încărcare
+        bannerEl.innerHTML = '';
         
         try {
             // Împarte numele în părți
@@ -885,31 +1052,64 @@ class HomepageManager {
 
     // Afișează datele primite din n8n
     displayAppointmentData(data, bannerEl, patientName) {
+        const normalizeValue = (value) => {
+            if (value === null || value === undefined) return 'N/A';
+            const str = String(value).trim();
+            if (!str || str.toLowerCase() === 'null') return 'N/A';
+            return str;
+        };
+
+        const capitalizeWords = (value) => {
+            const text = normalizeValue(value);
+            if (text === 'N/A') return text;
+            return text
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        };
+
+        const formatDateLabel = (value) => {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return 'N/A';
+
+            const parts = new Intl.DateTimeFormat('ro-RO', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }).formatToParts(date);
+
+            const day = parts.find(part => part.type === 'day')?.value || '';
+            const monthRaw = parts.find(part => part.type === 'month')?.value || '';
+            const year = parts.find(part => part.type === 'year')?.value || '';
+            const month = monthRaw ? monthRaw.charAt(0).toUpperCase() + monthRaw.slice(1) : '';
+
+            return [day, month, year].filter(Boolean).join(' ');
+        };
+
+        const formatTime = (value) => {
+            const text = normalizeValue(value);
+            if (text === 'N/A') return text;
+            if (text.includes(':')) return text.slice(0, 5);
+            return text;
+        };
+
         // Versiune 1: Dacă primești un array de programări
         if (Array.isArray(data.history)) {
             data.history.forEach((appointment, index) => {
-                const dateFormatted = new Date(appointment.data_programare).toLocaleDateString('ro-RO', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                });
-                
-                const timeFormatted = appointment.ora_start ? appointment.ora_start.substring(0, 5) : 'N/A';
-                
-                const medicFormatted = appointment.cabinet_medic
-                    .toString()
-                    .split(' ')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ');
-                
-                const details = appointment.info_relevante ? appointment.info_relevante : 'Nu au fost înregistrate alte detalii.';
+                const dateFormatted = formatDateLabel(appointment.data_programare);
+                const timeFormatted = formatTime(appointment.ora_start);
+                const medicFormatted = capitalizeWords(appointment.cabinet_medic);
+                const phone = normalizeValue(appointment.phone || appointment.telefon || appointment.tel);
+                const detailsRaw = normalizeValue(appointment.info_relevante);
                 
                 bannerEl.innerHTML += `
                     <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(229, 231, 235, 0.3);">
                         <strong>Programare ${index + 1}:</strong><br>
-                        <strong>Data:</strong> ${dateFormatted} la ${timeFormatted}<br>
+                        <strong>Data:</strong> ${dateFormatted} ${timeFormatted !== 'N/A' ? `la ${timeFormatted}` : ''}<br>
                         <strong>Medic:</strong> ${medicFormatted}<br>
-                        <strong>Detalii:</strong> ${details}<br>
+                        <strong>Telefon:</strong> ${phone}<br>
                     </div>
                 `;
             });
@@ -918,22 +1118,19 @@ class HomepageManager {
         else if (typeof data === 'object') {
             // Adaptează câmpurile în funcție de structura JSON-ului tău
             const dateStr = data.date || data.data || data.appointment_date;
-            const dateFormatted = dateStr ? new Date(dateStr).toLocaleDateString('ro-RO', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            }) : 'N/A';
+            const dateFormatted = formatDateLabel(dateStr);
+            const timeFormatted = formatTime(data.time || data.ora || data.appointment_time);
+            const medicFormatted = capitalizeWords(data.cabinet_medic || data.medic || data.doctor || data.doctor_name);
+            const phone = normalizeValue(data.phone || data.telefon || data.tel);
+            const patient = capitalizeWords(data.patient_name || data.nume_complet || data.prenume + ' ' + data.nume || patientName);
             
             bannerEl.innerHTML = `
-                <strong>Pacient:</strong> ${data.patient_name || data.nume_complet || data.prenume + ' ' + data.nume || patientName}<br>
-                <strong>Data:</strong> ${dateFormatted} la ${data.time || data.ora || data.appointment_time || 'N/A'}<br>
-                <strong>Detalii:</strong> ${data.details || data.detalii || data.description || 'N/A'}
+                <strong>Pacient:</strong> ${patient}<br>
+                <strong>Medic:</strong> ${medicFormatted}<br>
+                <strong>Telefon:</strong> ${phone}<br>
+                <strong>Data:</strong> ${dateFormatted} ${timeFormatted !== 'N/A' ? `la ${timeFormatted}` : ''}<br>
             `;
-            
-            // Adaugă orice alte câmpuri relevante din JSON
-            if (data.phone || data.telefon) {
-                bannerEl.innerHTML += `<br><strong>Telefon:</strong> ${data.phone || data.telefon}`;
-            }
+
             if (data.email) {
                 bannerEl.innerHTML += `<br><strong>Email:</strong> ${data.email}`;
             }
