@@ -162,18 +162,34 @@ class HomepageManager {
 
             const authData = this.getAuthCookie();
             const email = authData?.username || '';
-            if (email) {
-                fetch(`/api/form-links?email=${encodeURIComponent(email)}`)
-                    .then(response => response.ok ? response.json() : null)
-                    .then((data) => {
-                        if (data?.programare) currentLinks.programare = data.programare;
-                        if (data?.disponibilitate) currentLinks.disponibilitate = data.disponibilitate;
-                        loadForm(currentLinks.programare);
-                    })
-                    .catch(() => {
-                        loadForm(currentLinks.programare);
-                    });
+            if(email){
+                const linksPromise = fetchUserFormLinksViaEmail();
+                linksPromise.then(links => {
+                    if (links && links.programare) {
+                        loadForm(links.programare);
+                    } else {
+                        console.error("Could not load links");
+                    }
+                });
             }
+            // if (email) {
+            //     fetch(`/auth/api/form-links?email=${encodeURIComponent(email)}`, {
+            //         method: 'GET',
+            //         credentials: 'include'
+            //     })
+            //         .then(response => response.ok ? response.json() : null)
+            //         .then((data) => {
+            //             if (data?.Tally?.programare) currentLinks.programare = data.Tally.programare;
+            //             if (data?.Tally?.disponibilitate) currentLinks.disponibilitate = data.Tally.disponibilitate;
+            //             if (data?.N8N?.delete) currentLinks.delete = data.N8N.delete;
+            //             if (data?.N8N?.reprogramate) currentLinks.reprogramate = data.N8N.reprogramate;
+            //             if (data?.N8N?.search) currentLinks.search = data.N8N.search;
+            //             loadForm(currentLinks.programare);
+            //         })
+            //         .catch(() => {
+            //             loadForm(currentLinks.programare);
+            //         });
+            // }
         }
 
         // Configurează acțiunea butonului pentru căutarea pacientului
@@ -335,7 +351,7 @@ class HomepageManager {
         `;
 
         try {
-            const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook-test/imp-reprogramare-pacient';
+            const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-reprogramare-pacient';
             const ts = Date.now();
             const dataString = `ts=${ts}`;
             const encryptedData = await encryptRSA(dataString);
@@ -698,8 +714,6 @@ class HomepageManager {
         `;
         
         try {
-            // Caută programări în backend
-            //const API_URL = 'http://localhost:8000';
             const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-verificare-pacient';
             // ------
             // Împarte numele în părți
@@ -949,7 +963,16 @@ class HomepageManager {
      */
     async searchPatientAppointment(patientName, bannerEl) {
         // URL webhook n8n
-        const N8N_WEBHOOK_URL = 'https://transfit.site/n8n/webhook/imp-verificare-pacient';
+        const n8n_loaded_url = fetchUserFormLinks();
+        if(!n8n_loaded_url) {
+            bannerEl.innerHTML = `
+                <strong>Pacient:</strong> ${patientName}<br>
+                <span style="color: #ef4444;">Nu s-au găsit linkuri N8N pentru acest utilizator.</span><br>
+            `;
+            this.showNotification('Nu s-au găsit linkuri N8N pentru acest utilizator', 'error');
+            return;
+        }
+        const N8N_WEBHOOK_URL = n8n_loaded_url.search;
         
         // Curăță bannerul înainte de încărcare
         bannerEl.innerHTML = '';

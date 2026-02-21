@@ -16,7 +16,7 @@ load_dotenv()
 # Format: postgresql://user:password@host:port/database
 
 # Get the path to the directory where database.py is located
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Explicitly point to the .env file in the same directory
 load_dotenv(dotenv_path=BASE_DIR / ".env")

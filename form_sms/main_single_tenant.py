@@ -81,7 +81,7 @@ async def serve_confirmation_page(request: Request, tally_id: str, db: Session =
     })
 
 # 2. ROUTE: Handle the status update from the form
-@app.post("/api/status-update/{tally_id}")
+@app.post("c/api/status-update/{tally_id}")
 async def update_status(tally_id: str, data: StatusUpdate, db: Session = Depends(get_db)):
     apt = db.query(Appointment).filter(Appointment.tally_id == tally_id).first()
     

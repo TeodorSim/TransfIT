@@ -70,7 +70,8 @@ async def serve_multitenant_form(clinic_id: str, tally_id: str, request: Request
         db.close()
 
 # 2. ROUTE: Handle the status update from the form
-@app.post("/api/{clinic_id}/status-update/{tally_id}")
+@app.post("/c/api/{clinic_id}/status-update/{tally_id}")
+@app.post("/c/api/{clinic_id}/status-update/{tally_id}/")
 async def update_multitenant_status(
     clinic_id: str, 
     tally_id: str,
