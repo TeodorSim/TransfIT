@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>TransfIT - Pagina Principală</title>
+    <link rel="icon" type="image/png" href="../Start/logo transfit.png">
+    <link rel="stylesheet" href="style.css?v=20260212-1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <script src="../config.js?v=20260203-2"></script>
+    <script src="../Start/auth.js?v=20260209-2"></script>
+    <script>
+        // Protect this page - redirect if not authenticated
+        (async () => {
+            if (!(await window.authManager.protectPage())) {
+                // Will redirect to login if not authenticated
+            }
+        })();
+    </script>
+    
+    <!-- Navigare în bara laterală -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <img src="../Start/logo transfit.png" alt="TransfIT Logo" class="sidebar-logo">
+            <h2>TransfIT</h2>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-action="programare">
+                <span class="nav-icon">📅</span>
+                <span class="nav-text">Creare programare</span>
+            </a>
+            <a href="#" class="nav-item" data-action="stergere">
+                <span class="nav-icon">🗑️</span>
+                <span class="nav-text">Ștergere programare</span>
+            </a>
+            <a href="#" class="nav-item" data-action="reprogramari">
+                <span class="nav-icon">🔁</span>
+                <span class="nav-text">Reprogramări</span>
+            </a>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <a href="../Start/login.html" class="logout-btn">
+                <span class="nav-icon">🚪</span>
+                <span class="nav-text">Deconectare</span>
+            </a>
+        </div>
+    </aside>
+    
+    <!-- Conținut principal -->webhook
+    <main class="main-content">
+        <div class="content-header">
+            <h1>Bine ați venit la TransfIT</h1>
+            <p>V-ați conectat cu succes! Selectați o opțiune din meniul lateral pentru a continua.</p>
+        </div>
+    </main>
+    
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="script.js?v=20260213-2"></script>
+    <script src="security.js?v=20260203-2"></script>
+    <script src="scirpt_inject_customer_data.js"></script>
+</body>
+</html>
+
+

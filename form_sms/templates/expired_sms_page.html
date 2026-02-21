@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ clinic_name }}</title>
+    <!-- Professional Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', path='/sms_form_style.css') }}">
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="clinic-logo">
+        <img src="{{clinic_logo}}" alt="{{ clinic_name }} Logo" style="width: 40%; height: auto; margin-bottom: 10px;">
+    <div class="clinic-logo">{{ clinic_name }}</div>
+    
+    <h1 class="subtitle">Am înregistrat deja răspunsul dumneavoastră pentru această programare.</h1>
+
+
+    <div id="status-message"></div>
+    <div class="footer">                        
+        <p >
+            <a href="https://www.transfit.site/" target="_blank" style="text-decoration: none; color: inherit;">&copy; 2026 Transfit SRL</a>
+        </p>         
+    </div>     
+</div>
+
+<script>
+    const apiResponse = {
+        date: "{{ appointment_date }}",
+        time: "{{ appointment_time }}",
+        appointmentId: "{{ tally_id}}",
+        clinic_logo: "{{ clinic_logo }}",
+        clinic_name: "{{ clinic_name }}"
+    };
+</script>
+
+</body>
+</html>
