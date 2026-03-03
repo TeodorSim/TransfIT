@@ -1,0 +1,40 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Navigate to the app folder
+            cd /home/cicd_user/apps/transfit
+            
+            # Simple Deployment Logic:
+            git pull origin main
+            # 2. Build the Docker Image
+            docker compose up -d --build
+            # 3. Restart the container
+            
+            # For this example, we'll assume a standard Dockerfile exists in your repo
+            docker build -t my-microservice .
+            
+            docker stop my-microservice || true
+            docker rm my-microservice || true
+            
+            docker run -d \
+              --name my-microservice \
+              --network ci_cd_network \
+              --restart unless-stopped \
+              my-microservice
