@@ -23,18 +23,7 @@ jobs:
             
             # Simple Deployment Logic:
             git pull origin main
-            # 2. Build the Docker Image
-            docker compose up -d --build
-            # 3. Restart the container
-            
-            # For this example, we'll assume a standard Dockerfile exists in your repo
-            docker build -t my-microservice .
-            
-            docker stop my-microservice || true
-            docker rm my-microservice || true
-            
-            docker run -d \
-              --name my-microservice \
-              --network ci_cd_network \
-              --restart unless-stopped \
-              my-microservice
+            # Deploy via Compose:
+            docker compose up -d --build --remove-orphans
+            # 3. Housekeeping
+            docker system prune -f
