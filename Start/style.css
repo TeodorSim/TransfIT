@@ -380,6 +380,38 @@ body {
     transform: translate(-50%, -50%) scale(1);
 }
 
+.legal-links {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: -4px;
+    margin-bottom: 8px;
+}
+
+.legal-link-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(24, 0, 173, 0.25);
+    background: rgba(24, 0, 173, 0.03);
+    color: #1800ad;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    line-height: 1.2;
+    transition: all 0.2s ease;
+}
+
+.legal-link-btn:hover {
+    background: rgba(24, 0, 173, 0.08);
+    border-color: rgba(24, 0, 173, 0.35);
+    transform: translateY(-1px);
+}
+
 /* Separator vizual */
 .divider {
     text-align: center;
