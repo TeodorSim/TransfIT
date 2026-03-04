@@ -16,17 +16,18 @@ load_dotenv()
 # Format: postgresql://user:password@host:port/database
 
 # Get the path to the directory where database.py is located
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BACKEND_DIR = BASE_DIR / "backend"
+BACKEND_SERVICES_DIR = BASE_DIR / "backend_services"
 
 # Explicitly point to the .env file in the same directory
-load_dotenv(dotenv_path=BASE_DIR / ".env")
+load_dotenv(dotenv_path=BACKEND_SERVICES_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL_LOGIN")
-
 # Add a check to prevent the "None" crash with a helpful message
 if not DATABASE_URL:
     raise RuntimeError(
-        f"DATABASE_URL_LOGIN not found! Looked in: {BASE_DIR / '.env'}. "
+        f"DATABASE_URL_LOGIN not found! Looked in: {BACKEND_SERVICES_DIR / '.env'}. "
         "Please ensure the .env file exists and contains DATABASE_URL_LOGIN."
     )
 # Creare engine SQLAlchemy
@@ -35,7 +36,7 @@ engine = create_engine(
     echo=True,  # Setează la False în producție
     pool_pre_ping=True  # Verifică conexiunea înainte de utilizare
 )
-
+print(f"Database connected successfully to: {DATABASE_URL[DATABASE_URL.find('@') + 1:]}")  # Afișează doar host și database, nu user și password
 # Creare session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

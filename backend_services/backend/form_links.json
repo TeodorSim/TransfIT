@@ -28,24 +28,24 @@
     },
     "florinvel22@gmail.com": {
       "Tally": {
-        "programare": "https://tally.so/r/obeJvO",
-        "disponibilitate": "https://tally.so/r/vGDVKQ"
+        "programare": "https://tally.so/r/5Bdl0E",
+        "disponibilitate": "https://tally.so/r/obA0Nx"
       },
       "N8N":{
-        "delete" : "",
-        "reprogramate" : "",
-        "search": ""
+        "delete" : "https://n8n.transfit.sbs/webhook/test-stergere-programare-pacient",
+        "reprogramate" : "https://n8n.transfit.sbs/webhook/test-reprogramare-pacient",
+        "search": "https://n8n.transfit.sbs/webhook/test-verificare-pacient"
       }
     },
     "simionescu.mails@gmail.com": {
       "Tally": {
-        "programare": "https://tally.so/r/obeJvO",
-        "disponibilitate": "https://tally.so/r/vGDVKQ"
+        "programare": "https://tally.so/r/5Bdl0E",
+        "disponibilitate": "https://tally.so/r/obA0Nx"
       },
       "N8N":{
-        "delete" : "",
-        "reprogramate" : "",
-        "search": ""
+        "delete" : "https://n8n.transfit.sbs/webhook/test-stergere-programare-pacient",
+        "reprogramate" : "https://n8n.transfit.sbs/webhook/test-reprogramare-pacient",
+        "search": "https://n8n.transfit.sbs/webhook/test-verificare-pacient"
       }
     }
   }

@@ -6,7 +6,7 @@ API pentru gestionarea programărilor pacienților
 from fastapi import FastAPI, HTTPException, Depends, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -46,16 +46,18 @@ ADMIN_EMAILS = {
 }
 
 # Servește frontend-ul static pentru flow-ul Google OAuth (necesită HTTP, nu file://)
-BASE_DIR = Path(__file__).resolve().parent.parent
-FORM_LINKS_PATH = BASE_DIR / "backend" / "form_links.json"
-  
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BACKEND_SERVICES_DIR = BASE_DIR / "backend_services"
+BACKEND_LOGIN_DIR = BACKEND_SERVICES_DIR / "backend"
+FORM_LINKS_PATH = BACKEND_LOGIN_DIR / "form_links.json"
+
 def load_form_links():
     """Încarcă maparea formularelor per utilizator din fișier JSON."""
     if not FORM_LINKS_PATH.exists():
         return {
             "default": {
-                "programare": "https://tally.so/r/obeJvO",
-                "disponibilitate": "https://tally.so/r/vGDVKQ"
+                "programare": "https://tally.so/r/5Bdl0E",
+                "disponibilitate": "https://tally.so/r/obA0Nx"
             },
             "users": {}
         }
@@ -66,14 +68,14 @@ def load_form_links():
     except (OSError, json.JSONDecodeError):
         return {
             "default": {
-                "programare": "https://tally.so/r/obeJvO",
-                "disponibilitate": "https://tally.so/r/vGDVKQ"
+                "programare": "https://tally.so/r/5Bdl0E",
+                "disponibilitate": "https://tally.so/r/obA0Nx"
             },
             "users": {}
         }
 
-app.mount("/Start", StaticFiles(directory=str(BASE_DIR / "Start")), name="start")
-app.mount("/Homepage Rep", StaticFiles(directory=str(BASE_DIR / "Homepage Rep")), name="homepage")
+app.mount("/Start", StaticFiles(directory=str(BACKEND_SERVICES_DIR / "Start")), name="start")
+app.mount("/Homepage Rep", StaticFiles(directory=str(BACKEND_SERVICES_DIR / "Homepage Rep")), name="homepage")
 
 # Configurare CORS pentru frontend
 app.add_middleware(
@@ -169,13 +171,13 @@ def read_root():
 
 @app.get("/login")
 def serve_login_page():
-    """Servește pagina de login din frontend."""
-    return FileResponse(str(BASE_DIR / "Start" / "Login.html"))
+    """Redirects to the main login page with full features."""
+    return RedirectResponse(url="/Start/Login.html")
 
 @app.get("/config.js")
 def serve_config():
     """Servește fișierul config.js pentru frontend."""
-    return FileResponse(str(BASE_DIR / "config.js"))
+    return FileResponse(str(BACKEND_SERVICES_DIR / "config.js"))
 
 @app.post("/api/auth/register", response_model=UserResponse, status_code=201)
 def register_user(payload: RegisterRequest, db: Session = Depends(get_db)):
@@ -212,6 +214,7 @@ def login_user(payload: LoginRequest, response: Response, db: Session = Depends(
         max_age=SESSION_DAYS * 24 * 60 * 60,
         path="/"
     )
+    print(f"User {user.email} logged in, session token: {session.token}")
 
     return AuthResponse(
         user=UserResponse(id=user.id, email=user.email, role=user.role),
@@ -314,7 +317,7 @@ async def get_form_links(request: Request, email: Optional[str] = None):
 @app.get("/api/webhooks/delete-appointment")
 def forward_delete_webhook(data: str):
     """Trimite webhook-ul de stergere prin backend (evita CORS in browser)."""
-    webhook_url = "https://transfit.site/n8n/webhook/imp-stergere-programare-pacient"
+    webhook_url = "https://transfit.site/n8n/webhook/test-stergere-programare-pacient"
     try:
         with httpx.Client(timeout=10.0) as client:
             response = client.get(webhook_url, params={"data": data})
@@ -331,7 +334,7 @@ def forward_delete_webhook(data: str):
 @app.get("/api/appointments/search/{patient_name}")
 def search_patient_appointments(patient_name: str):
     """Proxy către n8n pentru căutarea programărilor (fără DB local)."""
-    webhook_url = "https://transfit.site/n8n/webhook/imp-verificare-pacient"
+    webhook_url = "https://transfit.site/n8n/webhook/test-verificare-pacient"
     name_parts = patient_name.strip().split(" ")
     prenume = ""
     nume = ""
@@ -360,7 +363,7 @@ def search_patient_appointments(patient_name: str):
 @app.get("/api/appointments/reprogramari")
 def list_reprogramari(status: Optional[str] = None, from_: Optional[str] = None, to: Optional[str] = None):
     """Lista programărilor care necesită reprogramare sau anulare."""
-    webhook_url = "https://transfit.site/n8n/webhook/imp-verificare-pacient"
+    webhook_url = "https://transfit.site/n8n/webhook/test-reprogramare-pacient"
 
     params = {}
     if status:
