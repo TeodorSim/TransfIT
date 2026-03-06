@@ -22,8 +22,8 @@ CLINICS_CONFIG = {
         "logo": "/forms-static/pro_implant_logo.svg"
     },
     "transfit": {
-        "db_url": os.getenv("DB_URL_PROIMPLANT"),
-        "pgp_key": os.getenv("PGP_KEY_PROIMPLANT"),
+        "db_url": os.getenv("DB_URL_TRANSFIT"),
+        "pgp_key": os.getenv("PGP_KEY_TRANSFIT"),
         "name": "Transfit",
         "logo": "/forms-static/TRANSFIT_mic.svg",
     }
@@ -32,6 +32,7 @@ CLINICS_CONFIG = {
 def get_clinic_config(clinic_id: str):
     config = CLINICS_CONFIG.get(clinic_id)
     if not config:
+        print("error in get_clinic_config in form_sms")
         return None, None
     engine = create_engine(config["db_url"])
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

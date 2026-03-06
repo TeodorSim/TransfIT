@@ -46,8 +46,7 @@ ADMIN_EMAILS = {
 }
 
 # Servește frontend-ul static pentru flow-ul Google OAuth (necesită HTTP, nu file://)
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-BACKEND_SERVICES_DIR = BASE_DIR / "backend_services"
+BACKEND_SERVICES_DIR = Path("/app")
 BACKEND_LOGIN_DIR = BACKEND_SERVICES_DIR / "backend"
 FORM_LINKS_PATH = BACKEND_LOGIN_DIR / "form_links.json"
 

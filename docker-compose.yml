@@ -1,0 +1,41 @@
+# 1. THE FRONTEND (transfit.sbs)
+services:
+  frontend:
+    build: ./frontend
+    container_name: transfit-frontend
+    ports:
+      - "8080:80"
+    networks:
+      - ci_cd_network
+
+  # 2. MICROSERVICES
+
+  login-backend:
+    build:
+      context: .
+      dockerfile: login_service/Dockerfile
+    container_name: login_backend
+    restart: always
+    env_file: .env # If you use environment variables
+    # Add ports if this service needs to be accessible externally
+    ports:
+      - "127.0.0.1:8082:8002"
+    networks:
+      - ci_cd_network
+
+  sms-service:
+    build:
+      context: .
+      dockerfile: form_sms_service/Dockerfile
+    container_name: sms_service
+    restart: always
+    env_file: .env
+    ports:
+      - "127.0.0.1:8081:8001"
+    networks:
+      - ci_cd_network
+
+networks:
+  ci_cd_network:
+    external: true
+    name: ci_cd_network

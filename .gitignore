@@ -49,3 +49,9 @@ Thumbs.db
 
 FactoryModel
 backend/__init__.py
+
+# CI/CD
+*override.yml
+nginx.conf
+/npm
+/proxy
