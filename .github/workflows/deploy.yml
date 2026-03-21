@@ -21,9 +21,24 @@ jobs:
             # Navigate to the app folder
             cd /home/cicd_user/apps/transfit
             
-            # Simple Deployment Logic:
-            git pull origin main
-            # Deploy via Compose:
-            docker compose up -d --build --remove-orphans
-            # 3. Housekeeping
-            docker system prune -f
+
+            # # Simple Deployment Logic:
+            # git pull origin main
+            # # Deploy via Compose:
+            # docker compose up -d --build --remove-orphans
+            # # 3. Housekeeping
+            # docker system prune -f
+
+            # 1. Force Git to overwrite any local "drift" on the server
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 2. Rebuild the frontend specifically without using the cache
+            # This ensures the 'COPY . /usr/share/nginx/html' step grabs the NEW files
+            docker compose build --no-cache frontend
+
+            # 3. Restart the services
+            docker compose up -d --remove-orphans
+
+            # 4. Clean up the old 'dangling' images to save disk space
+            docker image prune -f
